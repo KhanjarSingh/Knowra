@@ -188,7 +188,8 @@ export default function ChatBox() {
       <div className="flex h-screen w-full max-w-4xl flex-col px-4 py-6 sm:px-8 relative z-10">
         <header className="mb-6 flex items-center justify-between shrink-0 bg-transparent rounded-2xl py-2">
           <div className="flex flex-col">
-            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl flex items-center gap-3">
+              <img src="/Knowra.png" alt="Knowra Logo" className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl shadow-lg border border-white/10" />
               Knowra AI
             </h1>
             <p className={`mt-1 text-xs font-semibold tracking-wide uppercase ${isDark ? 'text-white/50' : 'text-black/50'}`}>
