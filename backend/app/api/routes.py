@@ -1,6 +1,6 @@
 import os
 import shutil
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
 from models.request_models import ChatRequest, IngestFileRequest, IngestGitHubRequest
 from models.response_models import (
     ChatResponse,
@@ -54,12 +54,12 @@ async def ingest_upload(file: UploadFile = File(...)):
         data=IngestData(chunks_added=count),
     )
 @router.post("/ingest/github", response_model=IngestResponse)
-def ingest_github(request: IngestGitHubRequest):
-    count = ingest_repo(request.repo_url)
+def ingest_github(request: IngestGitHubRequest, background_tasks: BackgroundTasks):
+    background_tasks.add_task(ingest_repo, request.repo_url)
     return IngestResponse(
         success=True,
-        message="GitHub repository ingested successfully",
-        data=IngestData(chunks_added=count),
+        message="GitHub repository ingestion started in the background",
+        data=IngestData(chunks_added=0, is_background=True),
     )
 @router.get("/status", response_model=StatusResponse)
 def status():

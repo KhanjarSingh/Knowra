@@ -1,11 +1,11 @@
-# Knowra AI 🔍
+# Knowra AI
 ### RAG for GitHub Repositories & Documents
 
 Knowra is a production-ready Retrieval-Augmented Generation (RAG) system designed to turn your GitHub repositories and local documents into an interactive, AI-powered knowledge base. Built for speed, precision, and a premium user experience.
 
 ---
 
-## 🚀 Key Features
+## Key Features
 
 - **GitHub Repository Ingestion**: Automatically clone, chunk, and index entire codebases with a single URL.
 - **Deep-Scan PDF Ingestion**: Beyond text extraction—Knowra scans PDF annotations to extract hidden URI hyperlinks (GitHub/Portfolio links) for high-fidelity source citation.
@@ -16,7 +16,7 @@ Knowra is a production-ready Retrieval-Augmented Generation (RAG) system designe
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 ### Backend (FastAPI)
 - **Engine**: FastAPI (Python 3.10+)
@@ -33,7 +33,7 @@ Knowra is a production-ready Retrieval-Augmented Generation (RAG) system designe
 
 ---
 
-## 📦 Project Structure
+## Project Structure
 
 ```bash
 Knowra/
@@ -53,7 +53,7 @@ Knowra/
 
 ---
 
-## 🔧 Local Setup
+## Local Setup
 
 ### Backend
 1. Navigate to `backend/`.
@@ -89,7 +89,31 @@ Knowra/
 
 ---
 
-## ☁️ Deployment
+## How to Use
+
+Knowra makes it incredibly easy to build your knowledge base. Here's how to get started:
+
+### 1. Chatting with AI
+Simply type your question in the message box. Knowra will search its indexed data and provide answers with **Verified Source Badges**.
+
+### 2. Adding Local Documents (PDF, TXT, MD)
+- Click the **+ (Add)** button in the input bar.
+- Select **"Upload Document"**.
+- Choose your file. Knowra will automatically chunk and index it.
+- *Tip: Knowra can even extract hidden links from within PDFs!*
+
+### 3. Ingesting GitHub Repositories
+- Click the **+ (Add)** button and select **"Add GitHub Repo"**.
+- Paste the full GitHub repository URL (e.g. `https://github.com/user/repo`).
+- Click **"Ingest Repo"**. Knowra will clone the code, analyze it, and add it to your context.
+
+### 4. Managing Knowledge
+- **Reset**: Use the trash icon in the header to wipe the index if you want to start fresh.
+- **Sources**: Hover over source badges in AI responses to see a snippet of the original data used to generate the answer.
+
+---
+
+## Deployment
 
 ### Backend (Render)
 - **Root Directory**: `backend`
@@ -104,5 +128,5 @@ Knowra/
 
 ---
 
-## 📜 License
+## License
 Knowra is open-source. Build something great!

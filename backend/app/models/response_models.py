@@ -9,6 +9,7 @@ class ChatResponse(BaseModel):
     data: ChatData
 class IngestData(BaseModel):
     chunks_added: int
+    is_background: bool = False
 class IngestResponse(BaseModel):
     success: bool
     message: str

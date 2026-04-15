@@ -1,4 +1,4 @@
-# Knowra RAG API 🧠
+# Knowra RAG API
 
 The backend for Knowra AI. A high-performance FastAPI server utilizing FAISS for vector search and Groq for blazing-fast LLM responses.
 

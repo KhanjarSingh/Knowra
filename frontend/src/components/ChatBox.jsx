@@ -71,6 +71,7 @@ export default function ChatBox() {
   const [userId] = useState(() => `user-${Math.random().toString(36).slice(2, 10)}`)
   const [isDark, setIsDark] = useState(true)
   const [showMenu, setShowMenu] = useState(false)
+  const [showHelp, setShowHelp] = useState(false)
   const [ingestMode, setIngestMode] = useState(null) 
   const chatRef = useRef(null)
   const inputRef = useRef(null)
@@ -105,9 +106,12 @@ export default function ChatBox() {
       setLoading(true)
       try {
         const res = await ingestGitHub(submission)
-        setMessages(prev => [...prev, { role: 'assistant', content: `✅ Successfully ingested ${res.data.chunks_added} chunks from the repository. The knowledge base is updated!`, sources: [] }])
+        const content = res.data.is_background 
+          ? "GitHub repository ingestion started in the background. The knowledge base will be updated shortly as processing completes."
+          : `Successfully ingested ${res.data.chunks_added} chunks from the repository. The knowledge base is updated!`
+        setMessages(prev => [...prev, { role: 'assistant', content: content, sources: [] }])
       } catch (err) {
-        setMessages(prev => [...prev, { role: 'assistant', content: `❌ Failed to ingest repository: ${err.message}`, sources: [] }])
+        setMessages(prev => [...prev, { role: 'assistant', content: `Failed to ingest repository: ${err.message}`, sources: [] }])
       } finally {
         setLoading(false)
       }
@@ -143,13 +147,13 @@ export default function ChatBox() {
     const file = e.target.files?.[0]
     if (!file) return
     if (fileInputRef.current) fileInputRef.current.value = ''
-    setMessages(prev => [...prev, { role: 'user', content: `Uploading document:\n📄 ${file.name}`, type: 'ingest' }])
+    setMessages(prev => [...prev, { role: 'user', content: `Uploading document: ${file.name}`, type: 'ingest' }])
     setLoading(true)
     try {
       const res = await uploadDocument(file)
-      setMessages(prev => [...prev, { role: 'assistant', content: `✅ Successfully ingested ${res.data.chunks_added} chunks from ${file.name}. The knowledge base is updated!`, sources: [] }])
+      setMessages(prev => [...prev, { role: 'assistant', content: `Successfully ingested ${res.data.chunks_added} chunks from ${file.name}. The knowledge base is updated!`, sources: [] }])
     } catch (err) {
-       setMessages(prev => [...prev, { role: 'assistant', content: `❌ Failed to ingest document: ${err.message}`, sources: [] }])
+       setMessages(prev => [...prev, { role: 'assistant', content: `Failed to ingest document: ${err.message}`, sources: [] }])
     } finally {
       setLoading(false)
     }
@@ -197,15 +201,29 @@ export default function ChatBox() {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <div className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold backdrop-blur-md transition-colors ${
+            <div className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] sm:text-xs font-semibold backdrop-blur-md transition-colors ${
               isDark ? 'border-white/10 bg-white/5 text-white/90' : 'border-black/10 bg-black/5 text-black/90'
             }`}>
               <span className="relative flex h-1.5 w-1.5">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75"></span>
                 <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
               </span>
-              System Online
+              <span className="hidden xs:inline">System Online</span>
+              <span className="inline xs:hidden">Online</span>
             </div>
+            <button 
+              onClick={(e) => { e.stopPropagation(); setShowHelp(true); }}
+              title="How it works"
+              className={`flex h-8 w-8 items-center justify-center rounded-full border backdrop-blur-md transition-all hover:scale-105 active:scale-95 ${
+                isDark ? 'border-white/10 bg-white/5 text-emerald-400 hover:bg-white/10' : 'border-black/10 bg-black/5 text-emerald-600 hover:bg-black/10'
+              }`}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+            </button>
             <button 
               onClick={(e) => { e.stopPropagation(); setIsDark(!isDark); }}
               className={`flex h-8 w-8 items-center justify-center rounded-full border backdrop-blur-md transition-all hover:scale-105 active:scale-95 ${
@@ -256,8 +274,8 @@ export default function ChatBox() {
                   <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
                 </svg>
               </div>
-              <h2 className="text-2xl font-bold tracking-tight">How can I help you today?</h2>
-              <p className={`mt-4 max-w-md text-[15px] leading-relaxed ${isDark ? 'text-white/60' : 'text-black/60'}`}>
+              <h2 className="text-xl sm:text-2xl font-bold tracking-tight px-4 text-center">How can I help you today?</h2>
+              <p className={`mt-4 max-w-md px-6 text-[13px] sm:text-[15px] leading-relaxed ${isDark ? 'text-white/60' : 'text-black/60'} text-center`}>
                 Start chatting to search your knowledge base. Use the + button below to ingest new GitHub repositories or upload local documents.
               </p>
             </div>
@@ -271,7 +289,7 @@ export default function ChatBox() {
             >
               {message.role === 'assistant' ? <AIBoxIcon isDark={isDark} /> : <UserIcon isDark={isDark} />}
               <div
-                className={`max-w-[85%] rounded-3xl px-5 py-4 text-[15px] leading-relaxed sm:max-w-[75%] ${
+                className={`max-w-[88%] rounded-2xl sm:rounded-3xl px-4 py-3 sm:px-5 sm:py-4 text-[14px] sm:text-[15px] leading-relaxed sm:max-w-[75%] ${
                   message.role === 'user'
                     ? (isDark ? 'bg-white text-black font-medium shadow-xl' : 'bg-black text-white font-medium shadow-xl')
                     : (isDark 
@@ -419,12 +437,13 @@ export default function ChatBox() {
             isDark 
               ? 'border-white/10 bg-black/60 focus-within:border-white/30 focus-within:bg-black/80' 
               : 'border-black/10 bg-white/60 focus-within:border-black/30 focus-within:bg-white/80'
-          } ${ingestMode ? (isDark ? 'ring-1 ring-white/50' : 'ring-1 ring-black/50') : 'hover:border-zinc-500/50'}`}>
+          } ${ingestMode ? (isDark ? 'ring-2 ring-emerald-500/50' : 'ring-2 ring-emerald-600/50') : 'hover:border-zinc-500/50'}`}>
             {}
-            <div className="absolute left-3 bottom-3 z-10 flex">
+            <div className="absolute left-3 bottom-3 z-10 flex items-center gap-2">
               {ingestMode ? (
                 <button
                   onClick={() => setIngestMode(null)}
+                  title="Cancel Ingestion"
                   className={`flex h-10 w-10 items-center justify-center rounded-2xl transition-all ${
                     isDark ? 'text-white/60 hover:text-white hover:bg-white/10' : 'text-black/60 hover:text-black hover:bg-black/10'
                   }`}
@@ -435,19 +454,34 @@ export default function ChatBox() {
                   </svg>
                 </button>
               ) : (
-                <button
-                  onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
-                  className={`flex h-10 w-10 items-center justify-center rounded-2xl transition-all ${
-                    showMenu 
-                      ? (isDark ? 'bg-white text-black' : 'bg-black text-white')
-                      : (isDark ? 'text-white/60 hover:text-white hover:bg-white/10' : 'text-black/60 hover:text-black hover:bg-black/10')
-                  }`}
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform duration-300 ${showMenu ? 'rotate-45' : ''}`}>
-                    <line x1="12" y1="5" x2="12" y2="19"/>
-                    <line x1="5" y1="12" x2="19" y2="12"/>
-                  </svg>
-                </button>
+                <div className="relative flex items-center">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
+                    title="Add Knowledge Source"
+                    className={`flex h-10 w-10 items-center justify-center rounded-2xl transition-all ${
+                      showMenu 
+                        ? (isDark ? 'bg-white text-black' : 'bg-black text-white')
+                        : (isDark ? 'text-white/60 hover:text-white hover:bg-white/10' : 'text-black/60 hover:text-black hover:bg-black/10')
+                    } ${messages.length === 0 && !input ? 'animate-pulse ring-2 ring-emerald-500/30' : ''}`}
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform duration-300 ${showMenu ? 'rotate-45' : ''}`}>
+                      <line x1="12" y1="5" x2="12" y2="19"/>
+                      <line x1="5" y1="12" x2="19" y2="12"/>
+                    </svg>
+                  </button>
+                  {messages.length === 0 && !input && !showMenu && (
+                    <div className="absolute bottom-full left-0 mb-4 animate-bounce pointer-events-none">
+                      <div className={`whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider shadow-2xl backdrop-blur-xl border ${
+                        isDark ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-emerald-50 border-emerald-200 text-emerald-600'
+                      }`}>
+                        Add Context
+                        <div className={`absolute top-full left-4 -mt-1 h-2 w-2 rotate-45 border-b border-r ${
+                          isDark ? 'bg-zinc-900 border-emerald-500/20' : 'bg-emerald-50 border-emerald-200'
+                        }`}></div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
             <textarea
@@ -455,33 +489,43 @@ export default function ChatBox() {
               value={input}
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={ingestMode === 'github' ? "Paste GitHub URL (e.g. https://github.com/user/repo)" : "Ask Knowra AI anything..."}
+              placeholder={ingestMode === 'github' ? "Paste GitHub URL..." : "Ask Knowra AI anything..."}
               rows={1}
               style={{ maxHeight: '200px' }}
-              className={`w-full resize-none border-0 bg-transparent py-4 pl-16 pr-16 text-[15px] leading-relaxed focus:outline-none focus:ring-0 ${
+              className={`w-full resize-none border-0 bg-transparent py-4 pl-12 sm:pl-16 pr-12 sm:pr-28 text-[14px] sm:text-[15px] leading-relaxed focus:outline-none focus:ring-0 ${
                 isDark ? 'text-white placeholder:text-white/40' : 'text-black placeholder:text-black/40'
-              } ${ingestMode ? 'font-mono text-sm' : ''}`}
+              } ${ingestMode ? 'font-mono text-xs sm:text-sm' : ''}`}
             />
             <button
               onClick={handleSend}
               disabled={!autoTrimmedInput || loading}
-              className={`absolute bottom-3 right-3 flex h-10 w-10 items-center justify-center rounded-2xl transition-all shadow-lg ${
-                isDark 
-                  ? 'bg-white text-black disabled:bg-white/10 disabled:text-white/30' 
-                  : 'bg-black text-white disabled:bg-black/10 disabled:text-black/30'
+              className={`absolute bottom-3 right-3 flex h-10 px-4 items-center justify-center rounded-2xl transition-all shadow-lg overflow-hidden ${
+                ingestMode === 'github'
+                  ? (isDark ? 'bg-emerald-500 text-white hover:bg-emerald-400' : 'bg-emerald-600 text-white hover:bg-emerald-700')
+                  : (isDark 
+                      ? 'bg-white text-black disabled:bg-white/10 disabled:text-white/30 hover:bg-zinc-100' 
+                      : 'bg-black text-white disabled:bg-black/10 disabled:text-black/30 hover:bg-zinc-900')
               } disabled:scale-95 disabled:cursor-not-allowed hover:scale-105 active:scale-95 disabled:hover:scale-95`}
             >
-              {ingestMode === 'github' ? (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                  <polyline points="17 8 12 3 7 8"/>
-                  <line x1="12" y1="3" x2="12" y2="15"/>
-                </svg>
-              ) : (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="translate-x-[1px]">
-                  <path d="M5 12h14M12 5l7 7-7 7" />
-                </svg>
-              )}
+              <div className="flex items-center gap-2">
+                {ingestMode === 'github' ? (
+                  <>
+                    <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-tight">Ingest Repo</span>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                      <polyline points="17 8 12 3 7 8"/>
+                      <line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                  </>
+                ) : (
+                  <>
+                    {autoTrimmedInput && <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-tight animate-in fade-in slide-in-from-right-2">Send</span>}
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="translate-x-[1px]">
+                      <path d="M5 12h14M12 5l7 7-7 7" />
+                    </svg>
+                  </>
+                )}
+              </div>
             </button>
           </div>
           <div className={`mt-3 flex justify-center gap-4 text-xs font-semibold ${isDark ? 'text-white/30' : 'text-black/40'}`}>
@@ -491,6 +535,118 @@ export default function ChatBox() {
           </div>
         </footer>
       </div>
+      {showHelp && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-300"
+          onClick={() => setShowHelp(false)}
+        >
+          <div 
+            className={`relative max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-3xl border p-6 sm:p-10 shadow-2xl animate-in zoom-in-95 duration-300 ${
+              isDark ? 'bg-zinc-900/90 border-white/10 text-white' : 'bg-white/90 border-black/10 text-black'
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button 
+              onClick={() => setShowHelp(false)}
+              className="absolute right-6 top-6 p-2 rounded-xl hover:bg-white/5 transition-colors"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+
+            <div className="flex items-center gap-4 mb-8">
+              <div className={`flex h-12 w-12 items-center justify-center rounded-2xl shadow-lg border ${
+                isDark ? 'bg-white/5 border-white/10 text-emerald-400' : 'bg-black/5 border-black/10 text-emerald-600'
+              }`}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold tracking-tight">How Knowra Works</h2>
+                <p className={`text-sm opacity-60`}>Your AI-powered context engine</p>
+              </div>
+            </div>
+
+            <div className="grid gap-8">
+              <section>
+                <h3 className="text-sm font-bold uppercase tracking-widest text-emerald-500 mb-4">Getting Started</h3>
+                <div className="grid gap-4">
+                  <div className={`p-4 rounded-2xl border ${isDark ? 'bg-white/5 border-white/5' : 'bg-black/5 border-black/5'}`}>
+                    <h4 className="font-bold text-sm mb-2 flex items-center gap-2">
+                       <span className="flex h-5 w-5 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-500 text-[10px]">1</span>
+                       Adding Knowledge
+                    </h4>
+                    <p className="text-xs opacity-60 leading-relaxed mb-3">Click the <span className="font-bold">+</span> button in the chat bar to open the ingestion menu.</p>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[10px] font-bold uppercase opacity-40 italic">For Documents</span>
+                        <p className="text-[11px] opacity-70">Select <span className="font-medium text-emerald-500">Upload Document</span> for PDF, TXT, or Markdown files.</p>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[10px] font-bold uppercase opacity-40 italic">For Codebases</span>
+                        <p className="text-[11px] opacity-70">Select <span className="font-medium text-emerald-500">Add GitHub Repo</span> and paste the full repository URL.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section>
+                <h3 className="text-sm font-bold uppercase tracking-widest text-emerald-500 mb-4">Core Concepts</h3>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className={`p-4 rounded-2xl border ${isDark ? 'bg-white/5 border-white/5' : 'bg-black/5 border-black/5'}`}>
+                    <h4 className="font-bold text-sm mb-1">RAG Engine</h4>
+                    <p className="text-xs opacity-60 leading-relaxed">Retrieval-Augmented Generation ensures answers are grounded in your actual documents, not generic AI knowledge.</p>
+                  </div>
+                  <div className={`p-4 rounded-2xl border ${isDark ? 'bg-white/5 border-white/5' : 'bg-black/5 border-black/5'}`}>
+                    <h4 className="font-bold text-sm mb-1">Vector Storage</h4>
+                    <p className="text-xs opacity-60 leading-relaxed">Data is split into "chunks" and converted into high-dimensional vectors for lightning-fast semantic retrieval.</p>
+                  </div>
+                </div>
+              </section>
+
+              <section>
+                <h3 className="text-sm font-bold uppercase tracking-widest text-emerald-500 mb-4">Features</h3>
+                <ul className="grid gap-4">
+                  <li className="flex items-start gap-4">
+                    <div className={`mt-1 h-5 w-5 shrink-0 rounded-lg flex items-center justify-center ${isDark ? 'bg-white/5 text-white/80' : 'bg-black/5 text-black/80'}`}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold">GitHub Ingestion</h4>
+                      <p className="text-[11px] sm:text-xs opacity-60 leading-relaxed">Paste a repo URL. We clone it, scan all code files, and index them in the background so you can chat with your entire codebase.</p>
+                    </div>
+                  </li>
+                  <li className="flex items-start gap-4">
+                    <div className={`mt-1 h-5 w-5 shrink-0 rounded-lg flex items-center justify-center ${isDark ? 'bg-white/5 text-white/80' : 'bg-black/5 text-black/80'}`}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold">Advanced PDF Processing</h4>
+                      <p className="text-[11px] sm:text-xs opacity-60 leading-relaxed">Beyond text—we extract metadata and even internal URI links to provide deep citations for scientific papers and professional reports.</p>
+                    </div>
+                  </li>
+                  <li className="flex items-start gap-4">
+                    <div className={`mt-1 h-5 w-5 shrink-0 rounded-lg flex items-center justify-center ${isDark ? 'bg-white/5 text-white/80' : 'bg-black/5 text-black/80'}`}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold">Verified Sources</h4>
+                      <p className="text-[11px] sm:text-xs opacity-60 leading-relaxed">Every AI response includes a badge showig where the info came from. Hover to see a raw data preview of that source.</p>
+                    </div>
+                  </li>
+                </ul>
+              </section>
+
+              <div className={`rounded-2xl p-4 text-center border ${isDark ? 'bg-emerald-500/5 border-emerald-500/10' : 'bg-emerald-50 border-emerald-100'}`}>
+                <p className="text-[11px] font-medium opacity-80">Knowra handles large datasets in the background. If you ingest a heavy repo, check back in a few moments!</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

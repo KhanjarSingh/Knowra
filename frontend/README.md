@@ -1,4 +1,4 @@
-# Knowra Web Interface 🎨
+# Knowra Web Interface
 
 A premium, glassmorphism-inspired chat interface for interacting with the Knowra RAG system.
 
