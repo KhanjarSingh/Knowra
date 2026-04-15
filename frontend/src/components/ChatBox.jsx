@@ -151,7 +151,10 @@ export default function ChatBox() {
     setLoading(true)
     try {
       const res = await uploadDocument(file)
-      setMessages(prev => [...prev, { role: 'assistant', content: `Successfully ingested ${res.data.chunks_added} chunks from ${file.name}. The knowledge base is updated!`, sources: [] }])
+      const content = res.data.is_background
+        ? `Knowledge base update started for ${file.name} in the background. It will be ready for questioning shortly.`
+        : `Successfully ingested ${res.data.chunks_added} chunks from ${file.name}. The knowledge base is updated!`
+      setMessages(prev => [...prev, { role: 'assistant', content: content, sources: [] }])
     } catch (err) {
        setMessages(prev => [...prev, { role: 'assistant', content: `Failed to ingest document: ${err.message}`, sources: [] }])
     } finally {

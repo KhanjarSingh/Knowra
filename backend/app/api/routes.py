@@ -39,19 +39,30 @@ def ingest_from_path(request: IngestFileRequest):
         data=IngestData(chunks_added=count),
     )
 @router.post("/ingest/upload", response_model=IngestResponse)
-async def ingest_upload(file: UploadFile = File(...)):
+async def ingest_upload(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
     tmp_path = f"/tmp/{file.filename}"
     try:
         with open(tmp_path, "wb") as f:
             shutil.copyfileobj(file.file, f)
-        count = ingest_file(tmp_path)
-    finally:
+        
+        # We define a wrapper because we need to delete the tmp file AFTER ingestion
+        def background_ingest_wrapper(path: str):
+            try:
+                ingest_file(path)
+            finally:
+                if os.path.exists(path):
+                    os.remove(path)
+
+        background_tasks.add_task(background_ingest_wrapper, tmp_path)
+    except Exception as e:
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
+        raise HTTPException(status_code=500, detail=str(e))
+
     return IngestResponse(
         success=True,
-        message="Uploaded file ingested successfully",
-        data=IngestData(chunks_added=count),
+        message="File received and ingestion started in the background",
+        data=IngestData(chunks_added=0, is_background=True),
     )
 @router.post("/ingest/github", response_model=IngestResponse)
 def ingest_github(request: IngestGitHubRequest, background_tasks: BackgroundTasks):
