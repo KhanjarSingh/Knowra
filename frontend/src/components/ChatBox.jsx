@@ -169,15 +169,15 @@ export default function ChatBox() {
     }
   }
   const containerStyle = isDark ? {
-    backgroundColor: '#0a0a0a',
+    backgroundColor: '
     backgroundImage: 'radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px)',
     backgroundSize: '20px 20px',
-    color: '#ffffff'
+    color: '
   } : {
-    backgroundColor: '#f8f8f8',
+    backgroundColor: '
     backgroundImage: 'radial-gradient(rgba(0, 0, 0, 0.08) 1px, transparent 1px)',
     backgroundSize: '20px 20px',
-    color: '#000000'
+    color: '
   }
   return (
     <div 
@@ -454,7 +454,7 @@ export default function ChatBox() {
               value={input}
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={ingestMode === 'github' ? "Paste GitHub URL (e.g. https://github.com/user/repo) and press Enter..." : "Ask a question about your knowledge base..."}
+              placeholder={ingestMode === 'github' ? "Paste GitHub URL (e.g. https:
               rows={1}
               style={{ maxHeight: '200px' }}
               className={`w-full resize-none border-0 bg-transparent py-4 pl-16 pr-16 text-[15px] leading-relaxed focus:outline-none focus:ring-0 ${

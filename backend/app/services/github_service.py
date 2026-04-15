@@ -15,7 +15,7 @@ def parse_repo_url(repo_url: str):
     repo = parts[-1].replace(".git", "")
     return owner, repo
 def get_repo_files(owner: str, repo: str, path: str = "") -> list:
-    url = f"https://api.github.com/repos/{owner}/{repo}/contents/{path}"
+    url = f"https:
     response = requests.get(url, headers=get_headers(), timeout=15)
     if response.status_code == 404:
         raise HTTPException(status_code=404, detail=f"Repo not found: {owner}/{repo}")

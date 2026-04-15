@@ -22,8 +22,7 @@ app.include_router(router)
 
 @app.on_event("startup")
 async def startup_event():
-    load()
-    print("FAISS index loaded ✅")
+    print("Knowra RAG AI starting up... (Lazy loading enabled)")
 
 
 @app.get("/health")

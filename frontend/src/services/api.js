@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost:8000/chat'
+const API_URL = 'http:
 export async function sendChatMessage(query, userId = 'web-user') {
   const response = await fetch(API_URL, {
     method: 'POST',
@@ -34,7 +34,7 @@ export async function sendChatMessage(query, userId = 'web-user') {
 export async function uploadDocument(file) {
   const formData = new FormData()
   formData.append('file', file)
-  const response = await fetch('http://localhost:8000/ingest/upload', {
+  const response = await fetch('http:
     method: 'POST',
     body: formData,
   })
@@ -43,7 +43,7 @@ export async function uploadDocument(file) {
   return data
 }
 export async function ingestGitHub(repoUrl) {
-  const response = await fetch('http://localhost:8000/ingest/github', {
+  const response = await fetch('http:
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ repo_url: repoUrl }),
@@ -53,7 +53,7 @@ export async function ingestGitHub(repoUrl) {
   return data
 }
 export async function resetIndex() {
-  const response = await fetch('http://localhost:8000/reset', {
+  const response = await fetch('http:
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
   })
