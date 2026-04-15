@@ -48,6 +48,7 @@ def fetch_file_content(download_url: str) -> str:
         return response.text
     return ""
 def ingest_repo(repo_url: str) -> int:
+    import time
     owner, repo = parse_repo_url(repo_url)
     files = get_repo_files(owner, repo)
     if not files:
@@ -60,4 +61,5 @@ def ingest_repo(repo_url: str) -> int:
         file_chunks = chunk_text(content, file["path"])
         add_chunks(file_chunks)
         total_chunks += len(file_chunks)
+        time.sleep(0.05)
     return total_chunks

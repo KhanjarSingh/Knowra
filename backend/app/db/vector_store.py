@@ -1,15 +1,19 @@
 import numpy as np
 import json
 import os
+import time
 from services.embedding_service import get_embeddings
 from config import FAISS_INDEX_PATH
+
 dimension = 384
 index = None
 chunks = []
 _loaded = False
+
 base_dir = os.path.abspath(FAISS_INDEX_PATH)
 index_file = os.path.join(base_dir, "index.bin")
 chunks_file = os.path.join(base_dir, "chunks.json")
+
 def load():
     global index, chunks, _loaded
     if _loaded:
@@ -23,20 +27,26 @@ def load():
     else:
         index = faiss.IndexFlatL2(dimension)
     _loaded = True
+
 def save():
     import faiss
     os.makedirs(base_dir, exist_ok=True)
     faiss.write_index(index, index_file)
     with open(chunks_file, "w") as f:
         json.dump(chunks, f)
+
 def add_chunks(texts: list):
     load()
     if not texts:
         return
-    embeddings = get_embeddings(texts)
-    vectors = np.array(embeddings).astype("float32")
-    index.add(vectors)
-    chunks.extend(texts)
+    batch_size = 4
+    for i in range(0, len(texts), batch_size):
+        batch = texts[i:i + batch_size]
+        embeddings = get_embeddings(batch)
+        vectors = np.array(embeddings).astype("float32")
+        index.add(vectors)
+        chunks.extend(batch)
+        time.sleep(0.05)
     save()
 def search(query_embedding: list, top_k: int = 5) -> list:
     load()
