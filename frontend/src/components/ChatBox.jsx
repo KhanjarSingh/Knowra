@@ -169,15 +169,15 @@ export default function ChatBox() {
     }
   }
   const containerStyle = isDark ? {
-    backgroundColor: '
+    backgroundColor: '#0a0a0a',
     backgroundImage: 'radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px)',
     backgroundSize: '20px 20px',
-    color: '
+    color: '#ffffff'
   } : {
-    backgroundColor: '
+    backgroundColor: '#ffffff',
     backgroundImage: 'radial-gradient(rgba(0, 0, 0, 0.08) 1px, transparent 1px)',
     backgroundSize: '20px 20px',
-    color: '
+    color: '#000000'
   }
   return (
     <div 
