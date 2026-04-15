@@ -1,13 +1,12 @@
 from services.embedding_service import get_embedding
 from db.vector_store import search
-from services.llm_service import generate_answer
+from services.llm_service import generate_answer, is_rag_query, generate_chat_answer
 
 
 def query_rag(question: str, top_k: int = 5) -> dict:
-    greetings = {"hi", "hello", "hey", "hii", "hiii", "good morning", "good evening", "how are you"}
-    if question.strip().lower() in greetings:
+    if not is_rag_query(question):
         return {
-            "answer": "Hello! I am your intelligent knowledge base assistant. Feel free to ask me anything about your ingested repositories or documents.",
+            "answer": generate_chat_answer(question),
             "sources": [],
             "context_count": 0,
         }

@@ -36,3 +36,29 @@ export async function sendChatMessage(query, userId = 'web-user') {
     sources: Array.isArray(data?.sources) ? data.sources : [],
   }
 }
+
+export async function uploadDocument(file) {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  const response = await fetch('http://localhost:8000/ingest/upload', {
+    method: 'POST',
+    body: formData,
+  })
+
+  const data = await response.json().catch(() => null)
+  if (!response.ok) throw new Error(data?.detail || data?.message || 'Upload failed')
+  return data
+}
+
+export async function ingestGitHub(repoUrl) {
+  const response = await fetch('http://localhost:8000/ingest/github', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ repo_url: repoUrl }),
+  })
+
+  const data = await response.json().catch(() => null)
+  if (!response.ok) throw new Error(data?.detail || data?.message || 'Ingest failed')
+  return data
+}

@@ -30,6 +30,6 @@ def ingest_file(file_path: str) -> int:
     if not text.strip():
         return 0
 
-    chunks = chunk_text(text)
+    chunks = chunk_text(text, os.path.basename(file_path))
     add_chunks(chunks)
     return len(chunks)

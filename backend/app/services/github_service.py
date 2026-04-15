@@ -32,12 +32,19 @@ def get_repo_files(owner: str, repo: str, path: str = "") -> list:
     items = response.json()
     files = []
 
+    EXCLUDED_DIRS = {"node_modules", "dist", "build", "venv", ".git", ".next", "out", "coverage", ".idea", "__pycache__"}
+    EXCLUDED_FILES = {"package-lock.json", "yarn.lock", "pnpm-lock.yaml", "poetry.lock", "Pipfile.lock", ".DS_Store"}
+
     for item in items:
         if item["type"] == "file":
+            if item["name"] in EXCLUDED_FILES:
+                continue
             ext = "." + item["name"].rsplit(".", 1)[-1] if "." in item["name"] else ""
             if ext in SUPPORTED_EXTENSIONS:
                 files.append(item)
         elif item["type"] == "dir":
+            if item["name"] in EXCLUDED_DIRS:
+                continue
             try:
                 files.extend(get_repo_files(owner, repo, item["path"]))
             except HTTPException:
@@ -63,7 +70,7 @@ def ingest_repo(repo_url: str) -> int:
         content = fetch_file_content(file["download_url"])
         if not content.strip():
             continue
-        file_chunks = chunk_text(content)
+        file_chunks = chunk_text(content, file["path"])
         add_chunks(file_chunks)
         total_chunks += len(file_chunks)
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { sendChatMessage } from '../services/api'
+import { sendChatMessage, uploadDocument, ingestGitHub } from '../services/api'
 
 function Loader({ isDark }) {
   const dotColor = isDark ? 'bg-white/70' : 'bg-black/60'
@@ -39,6 +39,35 @@ function UserIcon({ isDark }) {
   )
 }
 
+function renderText(text, isDark, isUser) {
+  if (!text) return null
+  const lines = text.split('\n')
+  return lines.map((line, idx) => {
+    const parts = line.split(/(\*\*.*?\*\*|`.*?`)/g)
+    return (
+      <span key={idx} className="block min-h-[1.2rem]">
+        {parts.map((part, i) => {
+          if (part.startsWith('**') && part.endsWith('**')) {
+            return (
+              <strong key={i} className={`font-semibold ${isUser ? (isDark ? 'text-black' : 'text-white') : (isDark ? 'text-white/95' : 'text-black/95')}`}>
+                {part.slice(2, -2)}
+              </strong>
+            )
+          }
+          if (part.startsWith('`') && part.endsWith('`')) {
+            return (
+              <code key={i} className={`px-1.5 py-0.5 rounded-md font-mono text-[13px] ${isUser ? (isDark ? 'bg-black/10' : 'bg-white/20') : (isDark ? 'bg-white/10 text-white/90' : 'bg-black/10 text-black/90')}`}>
+                {part.slice(1, -1)}
+              </code>
+            )
+          }
+          return part
+        })}
+      </span>
+    )
+  })
+}
+
 export default function ChatBox() {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
@@ -46,10 +75,15 @@ export default function ChatBox() {
   const [error, setError] = useState('')
   const [userId] = useState(() => `user-${Math.random().toString(36).slice(2, 10)}`)
   const [isDark, setIsDark] = useState(true)
+  
+  // Ingestion States
+  const [showMenu, setShowMenu] = useState(false)
+  const [ingestMode, setIngestMode] = useState(null) // 'github' or null
 
   const chatRef = useRef(null)
   const inputRef = useRef(null)
-  const trimmedInput = useMemo(() => input.trim(), [input])
+  const fileInputRef = useRef(null)
+  const autoTrimmedInput = useMemo(() => input.trim(), [input])
 
   useEffect(() => {
     if (!chatRef.current) return
@@ -62,25 +96,46 @@ export default function ChatBox() {
   useEffect(() => {
     if (inputRef.current) {
       inputRef.current.style.height = 'auto'
-      inputRef.current.style.height = `${inputRef.current.scrollHeight}px`
+      inputRef.current.style.height = `${Math.min(inputRef.current.scrollHeight, 200)}px`
     }
-  }, [input])
+  }, [input, ingestMode])
 
   async function handleSend() {
-    if (!trimmedInput || loading) return
+    if (!autoTrimmedInput || loading) return
 
-    const question = trimmedInput
+    const submission = autoTrimmedInput
     setInput('')
     setError('')
 
-    setMessages((prev) => [
-      ...prev,
-      { role: 'user', content: question },
-    ])
+    // Handle GitHub Ingestion Mode execution
+    if (ingestMode === 'github') {
+      setIngestMode(null)
+      if (!submission.startsWith('http')) {
+        setError('Invalid URL format for GitHub.')
+        setTimeout(() => setError(''), 3000)
+        return
+      }
 
+      setMessages(prev => [...prev, { role: 'user', content: `Processing GitHub Repository:\n${submission}`, type: 'ingest' }])
+      setLoading(true)
+
+      try {
+        const res = await ingestGitHub(submission)
+        setMessages(prev => [...prev, { role: 'assistant', content: `✅ Successfully ingested ${res.data.chunks_added} chunks from the repository. The knowledge base is updated!`, sources: [] }])
+      } catch (err) {
+        setMessages(prev => [...prev, { role: 'assistant', content: `❌ Failed to ingest repository: ${err.message}`, sources: [] }])
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
+
+    // Standard Chat Mode execution
+    setMessages((prev) => [...prev, { role: 'user', content: submission }])
     setLoading(true)
+
     try {
-      const result = await sendChatMessage(question, userId)
+      const result = await sendChatMessage(submission, userId)
       setMessages((prev) => [
         ...prev,
         {
@@ -91,6 +146,7 @@ export default function ChatBox() {
       ])
     } catch (err) {
       setError(err.message || 'Could not reach server')
+      setTimeout(() => setError(''), 3000)
     } finally {
       setLoading(false)
     }
@@ -103,34 +159,52 @@ export default function ChatBox() {
     }
   }
 
+  async function handleFileUpload(e) {
+    setShowMenu(false)
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (fileInputRef.current) fileInputRef.current.value = ''
+
+    setMessages(prev => [...prev, { role: 'user', content: `Uploading document:\n📄 ${file.name}`, type: 'ingest' }])
+    setLoading(true)
+
+    try {
+      const res = await uploadDocument(file)
+      setMessages(prev => [...prev, { role: 'assistant', content: `✅ Successfully ingested ${res.data.chunks_added} chunks from ${file.name}. The knowledge base is updated!`, sources: [] }])
+    } catch (err) {
+       setMessages(prev => [...prev, { role: 'assistant', content: `❌ Failed to ingest document: ${err.message}`, sources: [] }])
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const containerStyle = isDark ? {
-    backgroundColor: '#000000',
-    backgroundImage: `
-      radial-gradient(ellipse at 50% -20%, rgba(255, 255, 255, 0.15), transparent 60%),
-      radial-gradient(ellipse at 50% 120%, rgba(255, 255, 255, 0.05), transparent 50%)
-    `,
+    backgroundColor: '#0a0a0a',
+    backgroundImage: 'radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px)',
+    backgroundSize: '20px 20px',
     color: '#ffffff'
   } : {
-    backgroundColor: '#ffffff',
-    backgroundImage: `
-      radial-gradient(ellipse at 50% -20%, rgba(0, 0, 0, 0.05), transparent 60%),
-      radial-gradient(ellipse at 50% 120%, rgba(0, 0, 0, 0.02), transparent 50%)
-    `,
+    backgroundColor: '#f8f8f8',
+    backgroundImage: 'radial-gradient(rgba(0, 0, 0, 0.08) 1px, transparent 1px)',
+    backgroundSize: '20px 20px',
     color: '#000000'
   }
 
   return (
     <div 
-      className="min-h-screen w-full transition-colors duration-500 ease-in-out font-sans overflow-hidden"
+      className="min-h-screen w-full transition-colors duration-500 ease-in-out font-sans overflow-hidden flex flex-col items-center"
       style={containerStyle}
+      onClick={() => setShowMenu(false)}
     >
-      <div className="mx-auto flex h-screen w-full max-w-4xl flex-col px-4 py-6 sm:px-8">
-        <header className="mb-6 flex items-center justify-between">
+      <div className="flex h-screen w-full max-w-4xl flex-col px-4 py-6 sm:px-8 relative z-10">
+
+        <header className="mb-6 flex items-center justify-between shrink-0 bg-transparent rounded-2xl py-2">
           <div className="flex flex-col">
-            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl flex items-center gap-2">
               Knowra AI
             </h1>
-            <p className={`mt-1 text-sm font-medium tracking-wide ${isDark ? 'text-white/50' : 'text-black/50'}`}>
+            <p className={`mt-1 text-xs font-semibold tracking-wide uppercase ${isDark ? 'text-white/50' : 'text-black/50'}`}>
               RAG FOR GITHUB REPOS & DOCUMENTS
             </p>
           </div>
@@ -147,7 +221,7 @@ export default function ChatBox() {
             </div>
 
             <button 
-              onClick={() => setIsDark(!isDark)}
+              onClick={(e) => { e.stopPropagation(); setIsDark(!isDark); }}
               className={`flex h-8 w-8 items-center justify-center rounded-full border backdrop-blur-md transition-all hover:scale-105 active:scale-95 ${
                 isDark ? 'border-white/10 bg-white/5 text-white/80 hover:bg-white/10' : 'border-black/10 bg-black/5 text-black/80 hover:bg-black/10'
               }`}
@@ -175,20 +249,20 @@ export default function ChatBox() {
 
         <main
           ref={chatRef}
-          className="flex-1 space-y-6 overflow-y-auto pr-2 scroll-smooth scrollbar-none"
+          className="flex-1 space-y-6 overflow-y-auto pr-2 scroll-smooth pb-4 scrollbar-none"
         >
           {messages.length === 0 && (
             <div className="flex h-full flex-col items-center justify-center text-center">
-              <div className={`mb-6 flex h-16 w-16 items-center justify-center rounded-2xl border shadow-2xl backdrop-blur-xl transition-all duration-700 ${
-                isDark ? 'bg-white/5 text-white/80 border-white/10 hover:bg-white/10' : 'bg-black/5 text-black/70 border-black/10 hover:bg-black/10 shadow-black/5'
+              <div className={`mb-6 flex h-16 w-16 items-center justify-center rounded-3xl border shadow-2xl backdrop-blur-xl transition-all duration-700 ${
+                isDark ? 'bg-white/5 text-white/80 border-white/10 hover:bg-white/10' : 'bg-white text-black border-black/10 hover:bg-gray-50 shadow-black/5'
               }`}>
-                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
                 </svg>
               </div>
-              <h2 className="text-2xl font-semibold tracking-tight">How can I help you today?</h2>
-              <p className={`mt-4 max-w-md text-[15px] leading-relaxed ${isDark ? 'text-white/50' : 'text-black/60'}`}>
-                Query your indexed GitHub repositories and documents. I utilize retrieval-augmented generation to provide accurate, transparent answers sourced directly from your knowledge base.
+              <h2 className="text-2xl font-bold tracking-tight">How can I help you today?</h2>
+              <p className={`mt-4 max-w-md text-[15px] leading-relaxed ${isDark ? 'text-white/60' : 'text-black/60'}`}>
+                Start chatting to search your knowledge base. Use the + button below to ingest new GitHub repositories or upload local documents.
               </p>
             </div>
           )}
@@ -196,45 +270,90 @@ export default function ChatBox() {
           {messages.map((message, index) => (
             <div 
               key={`${message.role}-${index}`} 
-              className={`flex items-start gap-4 transition-all duration-500 ease-out ${
+              className={`flex items-start gap-4 transition-all duration-500 ease-out animate-in fade-in slide-in-from-bottom-2 ${
                 message.role === 'user' ? 'flex-row-reverse' : 'flex-row'
               }`}
             >
               {message.role === 'assistant' ? <AIBoxIcon isDark={isDark} /> : <UserIcon isDark={isDark} />}
               
               <div
-                className={`max-w-[85%] rounded-2xl px-5 py-4 text-[15px] leading-relaxed sm:max-w-[75%] ${
+                className={`max-w-[85%] rounded-3xl px-5 py-4 text-[15px] leading-relaxed sm:max-w-[75%] ${
                   message.role === 'user'
                     ? (isDark ? 'bg-white text-black font-medium shadow-xl' : 'bg-black text-white font-medium shadow-xl')
                     : (isDark 
-                        ? 'bg-white/5 text-white/90 border border-white/10 backdrop-blur-xl shadow-2xl shadow-white/5 font-light' 
-                        : 'bg-black/5 text-black/90 border border-black/10 backdrop-blur-xl shadow-2xl shadow-black/5 font-light')
+                        ? 'bg-black/40 text-white/90 border border-white/5 backdrop-blur-3xl shadow-xl shadow-black/50 font-light' 
+                        : 'bg-white text-black/90 border border-black/5 backdrop-blur-3xl shadow-xl shadow-black/5 font-light')
                 }`}
               >
-                <div className={`prose max-w-none whitespace-pre-wrap font-sans ${isDark ? 'prose-invert' : ''}`}>
-                  {message.content}
+                <div className={`font-sans ${isDark && message.role !== 'user' ? 'text-white' : ''} ${(message.role === 'user' && isDark) ? 'text-black' : ''}`}>
+                  {renderText(message.content, isDark, message.role === 'user')}
                 </div>
 
                 {message.role === 'assistant' && Array.isArray(message.sources) && message.sources.length > 0 && (
-                  <div className={`mt-5 flex flex-wrap gap-2 pt-4 border-t ${isDark ? 'border-white/10' : 'border-black/10'}`}>
-                    {message.sources.map((source, sourceIndex) => (
-                      <a 
-                        key={`${index}-source-${sourceIndex}`}
-                        href={source.startsWith('http') ? source : '#'}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={`group flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[11px] font-medium transition-all backdrop-blur-md ${
-                          isDark 
-                            ? 'border-white/10 bg-black/40 text-white/60 hover:border-white/30 hover:bg-white/10 hover:text-white' 
-                            : 'border-black/10 bg-black/5 text-black/60 hover:border-black/20 hover:bg-black/10 hover:text-black'
-                        }`}
-                      >
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-70 group-hover:opacity-100">
-                          <path d="M15 3h6v6M10 14L21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                        </svg>
-                        {source.length > 50 ? source.substring(0, 50) + '...' : source}
-                      </a>
-                    ))}
+                  <div className={`mt-5 flex flex-wrap gap-2 pt-4 border-t ${isDark ? 'border-white/10' : 'border-black/5'}`}>
+                    <span className={`text-[10px] uppercase font-bold tracking-wider self-center mr-2 ${isDark ? 'text-white/30' : 'text-black/40'}`}>Sources:</span>
+                    {message.sources.map((source, sourceIndex) => {
+                      const isUrl = source.startsWith('http')
+                      const sourceMatch = source.match(/^\[Source: (.*?)\]/)
+                      const displayTitle = sourceMatch 
+                        ? sourceMatch[1] 
+                        : (isUrl ? source : 'Document Snippet')
+                      
+                      const truncatedTitle = displayTitle.length > 30 ? displayTitle.substring(0, 30) + '...' : displayTitle
+
+                      if (isUrl) {
+                        return (
+                          <a 
+                            key={`${index}-source-${sourceIndex}`}
+                            href={source}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`group flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-[11px] font-medium transition-all backdrop-blur-md ${
+                              isDark 
+                                ? 'border-white/10 bg-white/5 text-white/60 hover:border-white/30 hover:bg-white/10 hover:text-white' 
+                                : 'border-black/5 bg-black/5 text-black/60 hover:border-black/20 hover:bg-black/10 hover:text-black'
+                            }`}
+                          >
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-70 group-hover:opacity-100">
+                              <path d="M15 3h6v6M10 14L21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                            </svg>
+                            {truncatedTitle}
+                          </a>
+                        )
+                      }
+
+                      return (
+                        <div 
+                          key={`${index}-source-${sourceIndex}`}
+                          className={`group relative flex cursor-help items-center gap-1.5 rounded-xl border px-3 py-1.5 text-[11px] font-medium transition-all backdrop-blur-md ${
+                            isDark 
+                              ? 'border-white/10 bg-white/5 text-white/60 hover:border-white/30 hover:text-white' 
+                              : 'border-black/5 bg-black/5 text-black/60 hover:border-black/20 hover:text-black'
+                          }`}
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-70">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                            <line x1="16" y1="13" x2="8" y2="13" />
+                            <line x1="16" y1="17" x2="8" y2="17" />
+                            <polyline points="10 9 9 9 8 9" />
+                          </svg>
+                          {truncatedTitle}
+                          
+                          {/* Custom Glassmorphism Tooltip */}
+                          <div className={`absolute bottom-full left-1/2 mb-2 w-72 -translate-x-1/2 scale-95 opacity-0 transition-all duration-200 pointer-events-none group-hover:pointer-events-auto group-hover:scale-100 group-hover:opacity-100 z-50 rounded-2xl border p-3.5 shadow-2xl backdrop-blur-3xl flex flex-col ${
+                            isDark ? 'bg-zinc-900/95 border-white/10 text-white/80' : 'bg-white/95 border-black/10 text-black/80'
+                          }`}>
+                            <div className={`mb-2 font-mono text-[10px] uppercase font-bold tracking-wider ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                              Data Preview
+                            </div>
+                            <div className="max-h-40 overflow-y-auto text-[11px] leading-relaxed scrollbar-thin scrollbar-thumb-white/10 pr-1 text-left whitespace-pre-wrap">
+                              {source}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
               </div>
@@ -244,8 +363,8 @@ export default function ChatBox() {
           {loading && (
             <div className="flex items-start gap-4 transition-all duration-300">
               <AIBoxIcon isDark={isDark} />
-              <div className={`rounded-2xl border px-6 py-4 shadow-2xl backdrop-blur-xl ${
-                isDark ? 'border-white/10 bg-white/5' : 'border-black/10 bg-black/5'
+              <div className={`rounded-3xl border px-6 py-4 shadow-2xl backdrop-blur-2xl ${
+                isDark ? 'border-white/5 bg-black/40' : 'border-black/5 bg-white'
               }`}>
                 <Loader isDark={isDark} />
               </div>
@@ -253,49 +372,133 @@ export default function ChatBox() {
           )}
         </main>
 
-        <footer className="relative mt-4 shrink-0 pb-4">
+        <footer className="relative mt-2 shrink-0 pb-2">
+          
+          {/* Action Menu (Floating above input) */}
+          {showMenu && (
+             <div 
+               className={`absolute bottom-full left-1 mb-3 w-48 rounded-2xl border shadow-2xl p-1.5 backdrop-blur-3xl animate-in fade-in slide-in-from-bottom-2 duration-200 z-20 ${
+                 isDark ? 'bg-zinc-900/90 border-white/10' : 'bg-white/90 border-black/10'
+               }`}
+             >
+                <button 
+                  onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); setShowMenu(false); }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                    isDark ? 'text-white/80 hover:bg-white/10' : 'text-black/80 hover:bg-black/5'
+                  }`}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="17 8 12 3 7 8"/>
+                    <line x1="12" y1="3" x2="12" y2="15"/>
+                  </svg>
+                  Upload Document
+                </button>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); setIngestMode('github'); setShowMenu(false); setInput(''); inputRef.current?.focus(); }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                    isDark ? 'text-white/80 hover:bg-white/10' : 'text-black/80 hover:bg-black/5'
+                  }`}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/>
+                  </svg>
+                  Add GitHub Repo
+                </button>
+             </div>
+          )}
+
+          {/* Hidden File Input */}
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleFileUpload} 
+            className="hidden" 
+            accept=".txt,.pdf,.md,.json,.csv"
+          />
+
           {error && (
-            <div className="absolute -top-12 left-0 right-0 flex justify-center transition-all duration-300">
+            <div className="absolute -top-12 left-0 right-0 flex justify-center animate-in fade-in slide-in-from-bottom-2">
               <div className="rounded-full bg-red-500/10 px-4 py-1.5 text-xs font-medium text-red-500 border border-red-500/20 backdrop-blur-xl shadow-lg">
                 {error}
               </div>
             </div>
           )}
 
-          <div className={`group relative overflow-hidden rounded-2xl border shadow-2xl backdrop-blur-2xl transition-all ${
+          <div className={`group relative overflow-hidden rounded-3xl border shadow-2xl backdrop-blur-3xl transition-all flex items-end ${
             isDark 
-              ? 'border-white/10 bg-white/5 focus-within:border-white/30 focus-within:bg-white/10 hover:border-white/20' 
-              : 'border-black/10 bg-black/5 focus-within:border-black/30 focus-within:bg-black/10 hover:border-black/20'
-          }`}>
+              ? 'border-white/10 bg-black/60 focus-within:border-white/30 focus-within:bg-black/80' 
+              : 'border-black/10 bg-white/60 focus-within:border-black/30 focus-within:bg-white/80'
+          } ${ingestMode ? (isDark ? 'ring-1 ring-white/50' : 'ring-1 ring-black/50') : 'hover:border-zinc-500/50'}`}>
+            
+            {/* Plus / Cancel Button */}
+            <div className="absolute left-3 bottom-3 z-10 flex">
+              {ingestMode ? (
+                <button
+                  onClick={() => setIngestMode(null)}
+                  className={`flex h-10 w-10 items-center justify-center rounded-2xl transition-all ${
+                    isDark ? 'text-white/60 hover:text-white hover:bg-white/10' : 'text-black/60 hover:text-black hover:bg-black/10'
+                  }`}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                </button>
+              ) : (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
+                  className={`flex h-10 w-10 items-center justify-center rounded-2xl transition-all ${
+                    showMenu 
+                      ? (isDark ? 'bg-white text-black' : 'bg-black text-white')
+                      : (isDark ? 'text-white/60 hover:text-white hover:bg-white/10' : 'text-black/60 hover:text-black hover:bg-black/10')
+                  }`}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform duration-300 ${showMenu ? 'rotate-45' : ''}`}>
+                    <line x1="12" y1="5" x2="12" y2="19"/>
+                    <line x1="5" y1="12" x2="19" y2="12"/>
+                  </svg>
+                </button>
+              )}
+            </div>
+
             <textarea
               ref={inputRef}
               value={input}
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask a question about your knowledge base..."
+              placeholder={ingestMode === 'github' ? "Paste GitHub URL (e.g. https://github.com/user/repo) and press Enter..." : "Ask a question about your knowledge base..."}
               rows={1}
               style={{ maxHeight: '200px' }}
-              className={`w-full resize-none border-0 bg-transparent py-4 pl-5 pr-14 text-[15px] leading-relaxed focus:outline-none focus:ring-0 ${
+              className={`w-full resize-none border-0 bg-transparent py-4 pl-16 pr-16 text-[15px] leading-relaxed focus:outline-none focus:ring-0 ${
                 isDark ? 'text-white placeholder:text-white/40' : 'text-black placeholder:text-black/40'
-              }`}
+              } ${ingestMode ? 'font-mono text-sm' : ''}`}
             />
 
             <button
               onClick={handleSend}
-              disabled={!trimmedInput || loading}
-              className={`absolute bottom-2.5 right-2.5 flex h-9 w-9 items-center justify-center rounded-xl transition-all shadow-lg ${
+              disabled={!autoTrimmedInput || loading}
+              className={`absolute bottom-3 right-3 flex h-10 w-10 items-center justify-center rounded-2xl transition-all shadow-lg ${
                 isDark 
                   ? 'bg-white text-black disabled:bg-white/10 disabled:text-white/30' 
                   : 'bg-black text-white disabled:bg-black/10 disabled:text-black/30'
               } disabled:scale-95 disabled:cursor-not-allowed hover:scale-105 active:scale-95 disabled:hover:scale-95`}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="translate-x-[1px]">
-                <path d="M5 12h14M12 5l7 7-7 7" />
-              </svg>
+              {ingestMode === 'github' ? (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="17 8 12 3 7 8"/>
+                  <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="translate-x-[1px]">
+                  <path d="M5 12h14M12 5l7 7-7 7" />
+                </svg>
+              )}
             </button>
           </div>
           
-          <div className={`mt-4 flex justify-center gap-4 text-[11px] font-medium ${isDark ? 'text-white/30' : 'text-black/40'}`}>
+          <div className={`mt-3 flex justify-center gap-4 text-xs font-semibold ${isDark ? 'text-white/30' : 'text-black/40'}`}>
             <span>AI can make mistakes. Verify important information.</span>
             <span className={`w-1 h-1 rounded-full self-center ${isDark ? 'bg-white/20' : 'bg-black/20'}`}></span>
             <span>Powered by your Data</span>
