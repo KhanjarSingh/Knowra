@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { sendChatMessage, uploadDocument, ingestGitHub } from '../services/api'
-
+import { sendChatMessage, uploadDocument, ingestGitHub, resetIndex } from '../services/api'
 function Loader({ isDark }) {
   const dotColor = isDark ? 'bg-white/70' : 'bg-black/60'
   return (
@@ -11,7 +10,6 @@ function Loader({ isDark }) {
     </div>
   )
 }
-
 function AIBoxIcon({ isDark }) {
   const bgColors = isDark 
     ? 'bg-white/10 text-white shadow-white/5 border-white/10' 
@@ -24,7 +22,6 @@ function AIBoxIcon({ isDark }) {
     </div>
   )
 }
-
 function UserIcon({ isDark }) {
   const bgColors = isDark 
     ? 'bg-white text-black border-white' 
@@ -38,7 +35,6 @@ function UserIcon({ isDark }) {
     </div>
   )
 }
-
 function renderText(text, isDark, isUser) {
   if (!text) return null
   const lines = text.split('\n')
@@ -67,7 +63,6 @@ function renderText(text, isDark, isUser) {
     )
   })
 }
-
 export default function ChatBox() {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
@@ -75,16 +70,12 @@ export default function ChatBox() {
   const [error, setError] = useState('')
   const [userId] = useState(() => `user-${Math.random().toString(36).slice(2, 10)}`)
   const [isDark, setIsDark] = useState(true)
-  
-  // Ingestion States
   const [showMenu, setShowMenu] = useState(false)
-  const [ingestMode, setIngestMode] = useState(null) // 'github' or null
-
+  const [ingestMode, setIngestMode] = useState(null) 
   const chatRef = useRef(null)
   const inputRef = useRef(null)
   const fileInputRef = useRef(null)
   const autoTrimmedInput = useMemo(() => input.trim(), [input])
-
   useEffect(() => {
     if (!chatRef.current) return
     chatRef.current.scrollTo({
@@ -92,22 +83,17 @@ export default function ChatBox() {
       behavior: 'smooth',
     })
   }, [messages, loading])
-
   useEffect(() => {
     if (inputRef.current) {
       inputRef.current.style.height = 'auto'
       inputRef.current.style.height = `${Math.min(inputRef.current.scrollHeight, 200)}px`
     }
   }, [input, ingestMode])
-
   async function handleSend() {
     if (!autoTrimmedInput || loading) return
-
     const submission = autoTrimmedInput
     setInput('')
     setError('')
-
-    // Handle GitHub Ingestion Mode execution
     if (ingestMode === 'github') {
       setIngestMode(null)
       if (!submission.startsWith('http')) {
@@ -115,10 +101,8 @@ export default function ChatBox() {
         setTimeout(() => setError(''), 3000)
         return
       }
-
       setMessages(prev => [...prev, { role: 'user', content: `Processing GitHub Repository:\n${submission}`, type: 'ingest' }])
       setLoading(true)
-
       try {
         const res = await ingestGitHub(submission)
         setMessages(prev => [...prev, { role: 'assistant', content: `✅ Successfully ingested ${res.data.chunks_added} chunks from the repository. The knowledge base is updated!`, sources: [] }])
@@ -129,11 +113,8 @@ export default function ChatBox() {
       }
       return
     }
-
-    // Standard Chat Mode execution
     setMessages((prev) => [...prev, { role: 'user', content: submission }])
     setLoading(true)
-
     try {
       const result = await sendChatMessage(submission, userId)
       setMessages((prev) => [
@@ -151,24 +132,19 @@ export default function ChatBox() {
       setLoading(false)
     }
   }
-
   function handleKeyDown(event) {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault()
       handleSend()
     }
   }
-
   async function handleFileUpload(e) {
     setShowMenu(false)
     const file = e.target.files?.[0]
     if (!file) return
-
     if (fileInputRef.current) fileInputRef.current.value = ''
-
     setMessages(prev => [...prev, { role: 'user', content: `Uploading document:\n📄 ${file.name}`, type: 'ingest' }])
     setLoading(true)
-
     try {
       const res = await uploadDocument(file)
       setMessages(prev => [...prev, { role: 'assistant', content: `✅ Successfully ingested ${res.data.chunks_added} chunks from ${file.name}. The knowledge base is updated!`, sources: [] }])
@@ -178,7 +154,20 @@ export default function ChatBox() {
       setLoading(false)
     }
   }
-
+  async function handleReset() {
+    if (!window.confirm("Are you sure you want to clear the entire knowledge base? This action cannot be undone.")) return
+    setLoading(true)
+    try {
+      await resetIndex()
+      setMessages([])
+      setError('')
+      alert("Knowledge base and chat history cleared successfully.")
+    } catch (err) {
+      setError(`Failed to reset: ${err.message}`)
+    } finally {
+      setLoading(false)
+    }
+  }
   const containerStyle = isDark ? {
     backgroundColor: '#0a0a0a',
     backgroundImage: 'radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px)',
@@ -190,7 +179,6 @@ export default function ChatBox() {
     backgroundSize: '20px 20px',
     color: '#000000'
   }
-
   return (
     <div 
       className="min-h-screen w-full transition-colors duration-500 ease-in-out font-sans overflow-hidden flex flex-col items-center"
@@ -198,7 +186,6 @@ export default function ChatBox() {
       onClick={() => setShowMenu(false)}
     >
       <div className="flex h-screen w-full max-w-4xl flex-col px-4 py-6 sm:px-8 relative z-10">
-
         <header className="mb-6 flex items-center justify-between shrink-0 bg-transparent rounded-2xl py-2">
           <div className="flex flex-col">
             <h1 className="text-2xl font-bold tracking-tight sm:text-3xl flex items-center gap-2">
@@ -208,7 +195,6 @@ export default function ChatBox() {
               RAG FOR GITHUB REPOS & DOCUMENTS
             </p>
           </div>
-          
           <div className="flex items-center gap-3">
             <div className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold backdrop-blur-md transition-colors ${
               isDark ? 'border-white/10 bg-white/5 text-white/90' : 'border-black/10 bg-black/5 text-black/90'
@@ -219,7 +205,6 @@ export default function ChatBox() {
               </span>
               System Online
             </div>
-
             <button 
               onClick={(e) => { e.stopPropagation(); setIsDark(!isDark); }}
               className={`flex h-8 w-8 items-center justify-center rounded-full border backdrop-blur-md transition-all hover:scale-105 active:scale-95 ${
@@ -244,9 +229,19 @@ export default function ChatBox() {
                 </svg>
               )}
             </button>
+            <button 
+              onClick={(e) => { e.stopPropagation(); handleReset(); }}
+              title="Reset Knowledge Base"
+              className={`flex h-8 w-8 items-center justify-center rounded-full border backdrop-blur-md transition-all hover:scale-105 active:scale-95 ${
+                isDark ? 'border-red-500/20 bg-red-500/5 text-red-400 hover:bg-red-500/20' : 'border-red-500/20 bg-red-500/5 text-red-600 hover:bg-red-500/10'
+              }`}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" />
+              </svg>
+            </button>
           </div>
         </header>
-
         <main
           ref={chatRef}
           className="flex-1 space-y-6 overflow-y-auto pr-2 scroll-smooth pb-4 scrollbar-none"
@@ -266,7 +261,6 @@ export default function ChatBox() {
               </p>
             </div>
           )}
-
           {messages.map((message, index) => (
             <div 
               key={`${message.role}-${index}`} 
@@ -275,7 +269,6 @@ export default function ChatBox() {
               }`}
             >
               {message.role === 'assistant' ? <AIBoxIcon isDark={isDark} /> : <UserIcon isDark={isDark} />}
-              
               <div
                 className={`max-w-[85%] rounded-3xl px-5 py-4 text-[15px] leading-relaxed sm:max-w-[75%] ${
                   message.role === 'user'
@@ -288,78 +281,79 @@ export default function ChatBox() {
                 <div className={`font-sans ${isDark && message.role !== 'user' ? 'text-white' : ''} ${(message.role === 'user' && isDark) ? 'text-black' : ''}`}>
                   {renderText(message.content, isDark, message.role === 'user')}
                 </div>
-
                 {message.role === 'assistant' && Array.isArray(message.sources) && message.sources.length > 0 && (
-                  <div className={`mt-5 flex flex-wrap gap-2 pt-4 border-t ${isDark ? 'border-white/10' : 'border-black/5'}`}>
-                    <span className={`text-[10px] uppercase font-bold tracking-wider self-center mr-2 ${isDark ? 'text-white/30' : 'text-black/40'}`}>Sources:</span>
-                    {message.sources.map((source, sourceIndex) => {
-                      const isUrl = source.startsWith('http')
-                      const sourceMatch = source.match(/^\[Source: (.*?)\]/)
-                      const displayTitle = sourceMatch 
-                        ? sourceMatch[1] 
-                        : (isUrl ? source : 'Document Snippet')
-                      
-                      const truncatedTitle = displayTitle.length > 30 ? displayTitle.substring(0, 30) + '...' : displayTitle
+                  <div className="mt-8 border-t border-white/5 pt-5">
+                    <div className="mb-4 flex items-center gap-2">
+                      <div className={`h-4 w-1 rounded-full ${isDark ? 'bg-emerald-500' : 'bg-emerald-600'}`}></div>
+                      <span className={`text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-white/40' : 'text-black/40'}`}>
+                        Verified Sources
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-2.5">
+                      {Array.from(new Set(message.sources.map(s => {
+                        const match = s.match(/^\[Source: (.*?)\]/)
+                        return match ? match[1] : s
+                      }))).map((uniqueSourceTitle, sourceIndex) => {
+                        const isUrl = uniqueSourceTitle.startsWith('http')
+                        const truncatedTitle = uniqueSourceTitle.length > 30 ? uniqueSourceTitle.substring(0, 30) + '...' : uniqueSourceTitle
+                        const previewChunk = message.sources.find(s => s.includes(`[Source: ${uniqueSourceTitle}]`)) || 'No preview available'
 
-                      if (isUrl) {
+                        if (isUrl) {
+                          return (
+                            <a 
+                              key={`${index}-source-${sourceIndex}`}
+                              href={uniqueSourceTitle}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={`group flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-[11px] font-medium transition-all backdrop-blur-md ${
+                                isDark 
+                                  ? 'border-white/10 bg-white/5 text-white/60 hover:border-white/30 hover:bg-white/10 hover:text-white' 
+                                  : 'border-black/5 bg-black/5 text-black/60 hover:border-black/20 hover:bg-black/10 hover:text-black'
+                              }`}
+                            >
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-70 group-hover:opacity-100">
+                                <path d="M15 3h6v6M10 14L21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                              </svg>
+                              {truncatedTitle}
+                            </a>
+                          )
+                        }
                         return (
-                          <a 
+                          <div 
                             key={`${index}-source-${sourceIndex}`}
-                            href={source}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={`group flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-[11px] font-medium transition-all backdrop-blur-md ${
+                            className={`group relative flex cursor-help items-center gap-1.5 rounded-xl border px-3 py-1.5 text-[11px] font-medium transition-all backdrop-blur-md ${
                               isDark 
-                                ? 'border-white/10 bg-white/5 text-white/60 hover:border-white/30 hover:bg-white/10 hover:text-white' 
-                                : 'border-black/5 bg-black/5 text-black/60 hover:border-black/20 hover:bg-black/10 hover:text-black'
+                                ? 'border-white/10 bg-white/5 text-white/60 hover:border-white/30 hover:text-white' 
+                                : 'border-black/5 bg-black/5 text-black/60 hover:border-black/20 hover:text-black'
                             }`}
                           >
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-70 group-hover:opacity-100">
-                              <path d="M15 3h6v6M10 14L21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-70">
+                              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                              <polyline points="14 2 14 8 20 8" />
+                              <line x1="16" y1="13" x2="8" y2="13" />
+                              <line x1="16" y1="17" x2="8" y2="17" />
+                              <polyline points="10 9 9 9 8 9" />
                             </svg>
                             {truncatedTitle}
-                          </a>
-                        )
-                      }
-
-                      return (
-                        <div 
-                          key={`${index}-source-${sourceIndex}`}
-                          className={`group relative flex cursor-help items-center gap-1.5 rounded-xl border px-3 py-1.5 text-[11px] font-medium transition-all backdrop-blur-md ${
-                            isDark 
-                              ? 'border-white/10 bg-white/5 text-white/60 hover:border-white/30 hover:text-white' 
-                              : 'border-black/5 bg-black/5 text-black/60 hover:border-black/20 hover:text-black'
-                          }`}
-                        >
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-70">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                            <polyline points="14 2 14 8 20 8" />
-                            <line x1="16" y1="13" x2="8" y2="13" />
-                            <line x1="16" y1="17" x2="8" y2="17" />
-                            <polyline points="10 9 9 9 8 9" />
-                          </svg>
-                          {truncatedTitle}
-                          
-                          {/* Custom Glassmorphism Tooltip */}
-                          <div className={`absolute bottom-full left-1/2 mb-2 w-72 -translate-x-1/2 scale-95 opacity-0 transition-all duration-200 pointer-events-none group-hover:pointer-events-auto group-hover:scale-100 group-hover:opacity-100 z-50 rounded-2xl border p-3.5 shadow-2xl backdrop-blur-3xl flex flex-col ${
-                            isDark ? 'bg-zinc-900/95 border-white/10 text-white/80' : 'bg-white/95 border-black/10 text-black/80'
-                          }`}>
-                            <div className={`mb-2 font-mono text-[10px] uppercase font-bold tracking-wider ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>
-                              Data Preview
-                            </div>
-                            <div className="max-h-40 overflow-y-auto text-[11px] leading-relaxed scrollbar-thin scrollbar-thumb-white/10 pr-1 text-left whitespace-pre-wrap">
-                              {source}
+                            <div className={`absolute bottom-full left-1/2 mb-2 w-72 -translate-x-1/2 scale-95 opacity-0 transition-all duration-200 pointer-events-none group-hover:pointer-events-auto group-hover:scale-100 group-hover:opacity-100 z-50 rounded-2xl border p-3.5 shadow-2xl backdrop-blur-3xl flex flex-col ${
+                              isDark ? 'bg-zinc-900/95 border-white/10 text-white/80' : 'bg-white/95 border-black/10 text-black/80'
+                            }`}>
+                              <div className={`mb-2 font-mono text-[10px] uppercase font-bold tracking-wider ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                                Data Preview
+                              </div>
+                              <div className="max-h-40 overflow-y-auto text-[10px] leading-relaxed font-mono scrollbar-thin scrollbar-thumb-white/10 pr-1 text-left whitespace-pre-wrap">
+                                {previewChunk}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      )
-                    })}
+                        )
+                      })}
+                    </div>
                   </div>
                 )}
               </div>
             </div>
           ))}
-
           {loading && (
             <div className="flex items-start gap-4 transition-all duration-300">
               <AIBoxIcon isDark={isDark} />
@@ -371,10 +365,8 @@ export default function ChatBox() {
             </div>
           )}
         </main>
-
         <footer className="relative mt-2 shrink-0 pb-2">
-          
-          {/* Action Menu (Floating above input) */}
+          {}
           {showMenu && (
              <div 
                className={`absolute bottom-full left-1 mb-3 w-48 rounded-2xl border shadow-2xl p-1.5 backdrop-blur-3xl animate-in fade-in slide-in-from-bottom-2 duration-200 z-20 ${
@@ -407,8 +399,7 @@ export default function ChatBox() {
                 </button>
              </div>
           )}
-
-          {/* Hidden File Input */}
+          {}
           <input 
             type="file" 
             ref={fileInputRef} 
@@ -416,7 +407,6 @@ export default function ChatBox() {
             className="hidden" 
             accept=".txt,.pdf,.md,.json,.csv"
           />
-
           {error && (
             <div className="absolute -top-12 left-0 right-0 flex justify-center animate-in fade-in slide-in-from-bottom-2">
               <div className="rounded-full bg-red-500/10 px-4 py-1.5 text-xs font-medium text-red-500 border border-red-500/20 backdrop-blur-xl shadow-lg">
@@ -424,14 +414,12 @@ export default function ChatBox() {
               </div>
             </div>
           )}
-
           <div className={`group relative overflow-hidden rounded-3xl border shadow-2xl backdrop-blur-3xl transition-all flex items-end ${
             isDark 
               ? 'border-white/10 bg-black/60 focus-within:border-white/30 focus-within:bg-black/80' 
               : 'border-black/10 bg-white/60 focus-within:border-black/30 focus-within:bg-white/80'
           } ${ingestMode ? (isDark ? 'ring-1 ring-white/50' : 'ring-1 ring-black/50') : 'hover:border-zinc-500/50'}`}>
-            
-            {/* Plus / Cancel Button */}
+            {}
             <div className="absolute left-3 bottom-3 z-10 flex">
               {ingestMode ? (
                 <button
@@ -461,7 +449,6 @@ export default function ChatBox() {
                 </button>
               )}
             </div>
-
             <textarea
               ref={inputRef}
               value={input}
@@ -474,7 +461,6 @@ export default function ChatBox() {
                 isDark ? 'text-white placeholder:text-white/40' : 'text-black placeholder:text-black/40'
               } ${ingestMode ? 'font-mono text-sm' : ''}`}
             />
-
             <button
               onClick={handleSend}
               disabled={!autoTrimmedInput || loading}
@@ -497,7 +483,6 @@ export default function ChatBox() {
               )}
             </button>
           </div>
-          
           <div className={`mt-3 flex justify-center gap-4 text-xs font-semibold ${isDark ? 'text-white/30' : 'text-black/40'}`}>
             <span>AI can make mistakes. Verify important information.</span>
             <span className={`w-1 h-1 rounded-full self-center ${isDark ? 'bg-white/20' : 'bg-black/20'}`}></span>

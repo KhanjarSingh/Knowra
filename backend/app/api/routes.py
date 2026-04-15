@@ -15,10 +15,7 @@ from services.rag_service import query_rag
 from services.ingest_service import ingest_file
 from services.github_service import ingest_repo
 from db.vector_store import get_chunk_count, reset
-
 router = APIRouter()
-
-
 @router.post("/chat", response_model=ChatResponse)
 def chat(request: ChatRequest):
     result = query_rag(request.query, request.top_k)
@@ -31,21 +28,16 @@ def chat(request: ChatRequest):
             context_count=result["context_count"],
         ),
     )
-
-
 @router.post("/ingest/file", response_model=IngestResponse)
 def ingest_from_path(request: IngestFileRequest):
     if not os.path.exists(request.file_path):
         raise HTTPException(status_code=404, detail="File not found")
-
     count = ingest_file(request.file_path)
     return IngestResponse(
         success=True,
         message="File ingested successfully",
         data=IngestData(chunks_added=count),
     )
-
-
 @router.post("/ingest/upload", response_model=IngestResponse)
 async def ingest_upload(file: UploadFile = File(...)):
     tmp_path = f"/tmp/{file.filename}"
@@ -56,14 +48,11 @@ async def ingest_upload(file: UploadFile = File(...)):
     finally:
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
-
     return IngestResponse(
         success=True,
         message="Uploaded file ingested successfully",
         data=IngestData(chunks_added=count),
     )
-
-
 @router.post("/ingest/github", response_model=IngestResponse)
 def ingest_github(request: IngestGitHubRequest):
     count = ingest_repo(request.repo_url)
@@ -72,8 +61,6 @@ def ingest_github(request: IngestGitHubRequest):
         message="GitHub repository ingested successfully",
         data=IngestData(chunks_added=count),
     )
-
-
 @router.get("/status", response_model=StatusResponse)
 def status():
     return StatusResponse(
@@ -81,8 +68,6 @@ def status():
         message="Index status fetched",
         data=StatusData(chunks_in_index=get_chunk_count()),
     )
-
-
 @router.post("/reset", response_model=ResetResponse)
 def reset_index():
     reset()
