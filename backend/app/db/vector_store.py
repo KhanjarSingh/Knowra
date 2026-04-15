@@ -1,11 +1,10 @@
-import faiss
 import numpy as np
 import json
 import os
 from services.embedding_service import get_embeddings
 from config import FAISS_INDEX_PATH
 dimension = 384
-index = faiss.IndexFlatL2(dimension)
+index = None
 chunks = []
 _loaded = False
 base_dir = os.path.abspath(FAISS_INDEX_PATH)
@@ -15,13 +14,17 @@ def load():
     global index, chunks, _loaded
     if _loaded:
         return
+    import faiss
     if os.path.exists(index_file) and os.path.exists(chunks_file):
         index = faiss.read_index(index_file)
         with open(chunks_file, "r") as f:
             chunks = json.load(f)
         print(f"Loaded {len(chunks)} chunks")
+    else:
+        index = faiss.IndexFlatL2(dimension)
     _loaded = True
 def save():
+    import faiss
     os.makedirs(base_dir, exist_ok=True)
     faiss.write_index(index, index_file)
     with open(chunks_file, "w") as f:
@@ -37,7 +40,7 @@ def add_chunks(texts: list):
     save()
 def search(query_embedding: list, top_k: int = 5) -> list:
     load()
-    if index.ntotal == 0:
+    if index is None or index.ntotal == 0:
         return []
     vector = np.array([query_embedding]).astype("float32")
     k = min(top_k, index.ntotal)
@@ -51,11 +54,13 @@ def search(query_embedding: list, top_k: int = 5) -> list:
     return results
 def get_chunk_count() -> int:
     load()
-    return index.ntotal
+    return index.ntotal if index else 0
 def reset():
-    global index, chunks
+    global index, chunks, _loaded
+    import faiss
     index = faiss.IndexFlatL2(dimension)
     chunks = []
+    _loaded = True
     if os.path.exists(index_file):
         os.remove(index_file)
     if os.path.exists(chunks_file):
