@@ -1,4 +1,5 @@
-const API_URL = 'http:
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+const API_URL = `${BASE_URL}/chat`
 export async function sendChatMessage(query, userId = 'web-user') {
   const response = await fetch(API_URL, {
     method: 'POST',
@@ -34,7 +35,7 @@ export async function sendChatMessage(query, userId = 'web-user') {
 export async function uploadDocument(file) {
   const formData = new FormData()
   formData.append('file', file)
-  const response = await fetch('http:
+  const response = await fetch(`${BASE_URL}/ingest/upload`, {
     method: 'POST',
     body: formData,
   })
@@ -43,7 +44,7 @@ export async function uploadDocument(file) {
   return data
 }
 export async function ingestGitHub(repoUrl) {
-  const response = await fetch('http:
+  const response = await fetch(`${BASE_URL}/ingest/github`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ repo_url: repoUrl }),
@@ -53,7 +54,7 @@ export async function ingestGitHub(repoUrl) {
   return data
 }
 export async function resetIndex() {
-  const response = await fetch('http:
+  const response = await fetch(`${BASE_URL}/reset`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
   })

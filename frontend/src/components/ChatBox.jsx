@@ -454,7 +454,7 @@ export default function ChatBox() {
               value={input}
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={ingestMode === 'github' ? "Paste GitHub URL (e.g. https:
+              placeholder={ingestMode === 'github' ? "Paste GitHub URL (e.g. https://github.com/user/repo)" : "Ask Knowra AI anything..."}
               rows={1}
               style={{ maxHeight: '200px' }}
               className={`w-full resize-none border-0 bg-transparent py-4 pl-16 pr-16 text-[15px] leading-relaxed focus:outline-none focus:ring-0 ${
