@@ -19,7 +19,7 @@ from models.response_models import (
 )
 from services.github_service import ingest_repo
 from services.ingest_service import ingest_file
-from services.job_service import get_job, job_to_dict, submit_job
+from services.job_service import get_job, job_to_dict
 from services.rag_service import query_rag
 
 router = APIRouter()
@@ -44,7 +44,7 @@ def ingest_from_path(request: IngestFileRequest) -> IngestResponse:
     if not os.path.exists(request.file_path):
         raise HTTPException(status_code=404, detail="File not found")
 
-    count = ingest_file(request.file_path)
+    count = ingest_file(request.file_path, source_name=os.path.basename(request.file_path))
     return IngestResponse(
         success=True,
         message="File ingested successfully",
@@ -69,7 +69,8 @@ def ingest_upload(file: UploadFile = File(...)) -> IngestResponse:
         file.file.close()
 
     try:
-        chunks_added = ingest_file(tmp_path)
+        source_name = file.filename or os.path.basename(tmp_path)
+        chunks_added = ingest_file(tmp_path, source_name=source_name)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to ingest uploaded file: {exc}") from exc
     finally:
@@ -90,15 +91,21 @@ def ingest_upload(file: UploadFile = File(...)) -> IngestResponse:
 
 @router.post("/ingest/github", response_model=IngestResponse)
 def ingest_github(request: IngestGitHubRequest) -> IngestResponse:
-    job = submit_job("github", request.repo_url, ingest_repo, request.repo_url)
+    try:
+        chunks_added = ingest_repo(request.repo_url)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to ingest repository: {exc}") from exc
+
     return IngestResponse(
         success=True,
-        message="GitHub repository ingestion queued.",
+        message="GitHub repository ingested successfully.",
         data=IngestData(
-            chunks_added=0,
-            is_background=True,
-            job_id=job.job_id,
-            job_status=job.status,
+            chunks_added=chunks_added,
+            is_background=False,
+            job_id=None,
+            job_status="completed",
         ),
     )
 

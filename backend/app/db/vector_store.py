@@ -68,9 +68,8 @@ def search(query_embedding: list[float], top_k: int = 5) -> list[str]:
         distances, indices = index.search(vector, k)
 
         results = []
-        distance_threshold = 1.7
-        for i, idx in enumerate(indices[0]):
-            if idx != -1 and idx < len(chunks) and distances[0][i] <= distance_threshold:
+        for idx in indices[0]:
+            if idx != -1 and idx < len(chunks):
                 results.append(chunks[idx])
         return results
 

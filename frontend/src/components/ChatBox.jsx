@@ -110,12 +110,17 @@ export default function ChatBox() {
         return
       }
       setMessages(prev => [...prev, { role: 'user', content: `Processing GitHub Repository:\n${submission}`, type: 'ingest' }])
-      setLoadingStatus('Queueing repository ingestion...')
+      setLoadingStatus('Indexing repository...')
       setLoading(true)
       try {
         const res = await ingestGitHub(submission)
         const jobId = res?.data?.job_id
-        if (!jobId) {
+        const isBackground = Boolean(res?.data?.is_background)
+        const chunksAdded = Number(res?.data?.chunks_added || 0)
+
+        if (!isBackground) {
+          setMessages(prev => [...prev, { role: 'assistant', content: `Repository indexing complete. Added ${chunksAdded} chunks to your knowledge base.`, sources: [] }])
+        } else if (!jobId) {
           setMessages(prev => [...prev, { role: 'assistant', content: 'Repository ingestion started, but no job id was returned.', sources: [] }])
         } else {
           setMessages(prev => [...prev, { role: 'assistant', content: 'Repository queued. I am indexing it now and will confirm once it is ready.', sources: [] }])

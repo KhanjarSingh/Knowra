@@ -125,8 +125,8 @@ Simply type your question in the message box. Knowra will search its indexed dat
 
 ### Ingestion Job Status
 - `POST /ingest/upload` ingests documents immediately and returns `chunks_added`
-- `POST /ingest/github` returns a `job_id`
-- Poll `GET /ingest/jobs/{job_id}` for GitHub ingestion until status is `completed` or `failed`
+- `POST /ingest/github` ingests repositories immediately and returns `chunks_added`
+- `GET /ingest/jobs/{job_id}` remains available for legacy/background workflows
 
 ### Frontend (Vercel)
 - **Root Directory**: `frontend`

@@ -40,7 +40,7 @@ def read_pdf(file_path: str) -> str:
 def read_text_file(file_path: str) -> str:
     with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
         return f.read()
-def ingest_file(file_path: str) -> int:
+def ingest_file(file_path: str, source_name: str | None = None) -> int:
     update_current_job(progress_message="Preparing file ingestion")
     ext = os.path.splitext(file_path)[-1].lower()
     if ext == ".pdf":
@@ -54,7 +54,8 @@ def ingest_file(file_path: str) -> int:
     if not text.strip():
         return 0
     update_current_job(progress_message="Chunking content")
-    chunks = chunk_text(text, os.path.basename(file_path))
+    final_source_name = source_name or os.path.basename(file_path)
+    chunks = chunk_text(text, final_source_name)
     total = len(chunks)
     if total == 0:
         return 0
