@@ -121,6 +121,7 @@ Simply type your question in the message box. Knowra will search its indexed dat
 - **Build Command**: `pip install -r requirements.txt`
 - **Start Command**: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
 - **Environment Variables**: Add `GROQ_API_KEY` and `GITHUB_TOKEN`.
+- **Optional**: `EMBEDDING_BACKEND=hash` for fastest and most stable ingestion on low-memory instances. Use `sentence-transformers` for higher semantic quality if resources allow.
 
 ### Ingestion Job Status
 - `POST /ingest/upload` or `POST /ingest/github` returns a `job_id`

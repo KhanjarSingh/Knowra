@@ -64,6 +64,13 @@ def ingest_file(file_path: str) -> int:
     processed = 0
     for start in range(0, total, batch_size):
         batch = chunks[start : start + batch_size]
+        next_count = processed + len(batch)
+        update_current_job(
+            progress_current=processed,
+            progress_total=total,
+            chunks_added=processed,
+            progress_message=f"Embedding chunk batch {processed + 1}-{next_count} of {total}",
+        )
         add_chunks(batch)
         processed += len(batch)
         update_current_job(
