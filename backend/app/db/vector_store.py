@@ -39,7 +39,7 @@ def add_chunks(texts: list):
     load()
     if not texts:
         return
-    batch_size = 4
+    batch_size = 2
     for i in range(0, len(texts), batch_size):
         batch = texts[i:i + batch_size]
         embeddings = get_embeddings(batch)
