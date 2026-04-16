@@ -39,16 +39,20 @@ def ingest_from_path(request: IngestFileRequest):
         data=IngestData(chunks_added=count),
     )
 @router.post("/ingest/upload", response_model=IngestResponse)
-async def ingest_upload(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
-    tmp_path = f"/tmp/{file.filename}"
+def ingest_upload(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+    import tempfile
+    ext = os.path.splitext(file.filename)[-1].lower() if file.filename else ".pdf"
+    fd, tmp_path = tempfile.mkstemp(suffix=ext)
+    
     try:
-        with open(tmp_path, "wb") as f:
+        with os.fdopen(fd, "wb") as f:
             shutil.copyfileobj(file.file, f)
         
-        # We define a wrapper because we need to delete the tmp file AFTER ingestion
         def background_ingest_wrapper(path: str):
             try:
                 ingest_file(path)
+            except Exception as e:
+                print(f"Background ingestion failed: {e}")
             finally:
                 if os.path.exists(path):
                     os.remove(path)
