@@ -1,23 +1,32 @@
 import os
 import shutil
-from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
+import tempfile
+
+from fastapi import APIRouter, File, HTTPException, UploadFile
+
+from db.vector_store import get_chunk_count, reset
 from models.request_models import ChatRequest, IngestFileRequest, IngestGitHubRequest
 from models.response_models import (
-    ChatResponse,
     ChatData,
-    IngestResponse,
+    ChatResponse,
     IngestData,
-    StatusResponse,
-    StatusData,
+    IngestResponse,
+    JobData,
+    JobResponse,
     ResetResponse,
+    StatusData,
+    StatusResponse,
 )
-from services.rag_service import query_rag
-from services.ingest_service import ingest_file
 from services.github_service import ingest_repo
-from db.vector_store import get_chunk_count, reset
+from services.ingest_service import ingest_file
+from services.job_service import get_job, job_to_dict, submit_job
+from services.rag_service import query_rag
+
 router = APIRouter()
+
+
 @router.post("/chat", response_model=ChatResponse)
-def chat(request: ChatRequest):
+def chat(request: ChatRequest) -> ChatResponse:
     result = query_rag(request.query, request.top_k)
     return ChatResponse(
         success=True,
@@ -28,62 +37,93 @@ def chat(request: ChatRequest):
             context_count=result["context_count"],
         ),
     )
+
+
 @router.post("/ingest/file", response_model=IngestResponse)
-def ingest_from_path(request: IngestFileRequest):
+def ingest_from_path(request: IngestFileRequest) -> IngestResponse:
     if not os.path.exists(request.file_path):
         raise HTTPException(status_code=404, detail="File not found")
+
     count = ingest_file(request.file_path)
     return IngestResponse(
         success=True,
         message="File ingested successfully",
         data=IngestData(chunks_added=count),
     )
+
+
 @router.post("/ingest/upload", response_model=IngestResponse)
-def ingest_upload(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
-    import tempfile
+def ingest_upload(file: UploadFile = File(...)) -> IngestResponse:
     ext = os.path.splitext(file.filename)[-1].lower() if file.filename else ".pdf"
     fd, tmp_path = tempfile.mkstemp(suffix=ext)
-    
-    try:
-        with os.fdopen(fd, "wb") as f:
-            shutil.copyfileobj(file.file, f)
-        
-        def background_ingest_wrapper(path: str):
-            try:
-                ingest_file(path)
-            except Exception as e:
-                print(f"Background ingestion failed: {e}")
-            finally:
-                if os.path.exists(path):
-                    os.remove(path)
+    os.close(fd)
 
-        background_tasks.add_task(background_ingest_wrapper, tmp_path)
-    except Exception as e:
+    try:
+        with open(tmp_path, "wb") as output:
+            shutil.copyfileobj(file.file, output)
+    except Exception as exc:
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to receive upload: {exc}") from exc
+    finally:
+        file.file.close()
 
+    job = submit_job(
+        "document",
+        file.filename or os.path.basename(tmp_path),
+        ingest_file,
+        tmp_path,
+        cleanup=lambda: os.path.exists(tmp_path) and os.remove(tmp_path),
+    )
     return IngestResponse(
         success=True,
-        message="File received and ingestion started in the background",
-        data=IngestData(chunks_added=0, is_background=True),
+        message="File received. Ingestion queued.",
+        data=IngestData(
+            chunks_added=0,
+            is_background=True,
+            job_id=job.job_id,
+            job_status=job.status,
+        ),
     )
+
+
 @router.post("/ingest/github", response_model=IngestResponse)
-def ingest_github(request: IngestGitHubRequest, background_tasks: BackgroundTasks):
-    background_tasks.add_task(ingest_repo, request.repo_url)
+def ingest_github(request: IngestGitHubRequest) -> IngestResponse:
+    job = submit_job("github", request.repo_url, ingest_repo, request.repo_url)
     return IngestResponse(
         success=True,
-        message="GitHub repository ingestion started in the background",
-        data=IngestData(chunks_added=0, is_background=True),
+        message="GitHub repository ingestion queued.",
+        data=IngestData(
+            chunks_added=0,
+            is_background=True,
+            job_id=job.job_id,
+            job_status=job.status,
+        ),
     )
+
+
+@router.get("/ingest/jobs/{job_id}", response_model=JobResponse)
+def get_ingest_job(job_id: str) -> JobResponse:
+    job = get_job(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return JobResponse(
+        success=True,
+        message="Job status fetched",
+        data=JobData(**job_to_dict(job)),
+    )
+
+
 @router.get("/status", response_model=StatusResponse)
-def status():
+def status() -> StatusResponse:
     return StatusResponse(
         success=True,
         message="Index status fetched",
         data=StatusData(chunks_in_index=get_chunk_count()),
     )
+
+
 @router.post("/reset", response_model=ResetResponse)
-def reset_index():
+def reset_index() -> ResetResponse:
     reset()
     return ResetResponse(success=True, message="Index cleared")

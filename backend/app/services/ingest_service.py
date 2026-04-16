@@ -2,6 +2,11 @@ import os
 import PyPDF2
 from db.vector_store import add_chunks
 from utils.chunker import chunk_text
+
+
+MAX_INGEST_CHARS = 1_500_000
+
+
 def read_pdf(file_path: str) -> str:
     text = ""
     with open(file_path, "rb") as f:
@@ -34,6 +39,8 @@ def ingest_file(file_path: str) -> int:
         text = read_text_file(file_path)
     else:
         text = read_text_file(file_path)
+    if len(text) > MAX_INGEST_CHARS:
+        text = text[:MAX_INGEST_CHARS]
     if not text.strip():
         return 0
     chunks = chunk_text(text, os.path.basename(file_path))

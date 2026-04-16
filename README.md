@@ -8,6 +8,7 @@ Knowra is a production-ready Retrieval-Augmented Generation (RAG) system designe
 ## Key Features
 
 - **GitHub Repository Ingestion**: Automatically clone, chunk, and index entire codebases with a single URL.
+- **Queued Background Ingestion Jobs**: Uploads and GitHub indexing now run in managed worker jobs with status polling, improving deployment stability on Render.
 - **Deep-Scan PDF Ingestion**: Beyond text extraction—Knowra scans PDF annotations to extract hidden URI hyperlinks (GitHub/Portfolio links) for high-fidelity source citation.
 - **Verified Sources System**: Every answer is backed by verified citations. Hover over source badges to see monospaced code/text previews of the actual data used.
 - **Extreme Lazy Loading**: Optimized for cloud deployment (e.g., Render/Vercel). The backend starts instantly, deferring heavy ML library imports until the first request.
@@ -120,6 +121,10 @@ Simply type your question in the message box. Knowra will search its indexed dat
 - **Build Command**: `pip install -r requirements.txt`
 - **Start Command**: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
 - **Environment Variables**: Add `GROQ_API_KEY` and `GITHUB_TOKEN`.
+
+### Ingestion Job Status
+- `POST /ingest/upload` or `POST /ingest/github` returns a `job_id`
+- Poll `GET /ingest/jobs/{job_id}` until status is `completed` or `failed`
 
 ### Frontend (Vercel)
 - **Root Directory**: `frontend`

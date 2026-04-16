@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { sendChatMessage, uploadDocument, ingestGitHub, resetIndex } from '../services/api'
+import { sendChatMessage, uploadDocument, ingestGitHub, resetIndex, waitForIngestJob } from '../services/api'
 function Loader({ isDark }) {
   const dotColor = isDark ? 'bg-white/70' : 'bg-black/60'
   return (
@@ -68,7 +68,6 @@ export default function ChatBox() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [userId] = useState(() => `user-${Math.random().toString(36).slice(2, 10)}`)
   const [isDark, setIsDark] = useState(true)
   const [showMenu, setShowMenu] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
@@ -106,10 +105,14 @@ export default function ChatBox() {
       setLoading(true)
       try {
         const res = await ingestGitHub(submission)
-        const content = res.data.is_background 
-          ? "GitHub repository ingestion started in the background. The knowledge base will be updated shortly as processing completes."
-          : `Successfully ingested ${res.data.chunks_added} chunks from the repository. The knowledge base is updated!`
-        setMessages(prev => [...prev, { role: 'assistant', content: content, sources: [] }])
+        const jobId = res?.data?.job_id
+        if (!jobId) {
+          setMessages(prev => [...prev, { role: 'assistant', content: 'Repository ingestion started, but no job id was returned.', sources: [] }])
+        } else {
+          setMessages(prev => [...prev, { role: 'assistant', content: 'Repository queued. I am indexing it now and will confirm once it is ready.', sources: [] }])
+          const job = await waitForIngestJob(jobId)
+          setMessages(prev => [...prev, { role: 'assistant', content: `Repository indexing complete. Added ${job.chunks_added} chunks to your knowledge base.`, sources: [] }])
+        }
       } catch (err) {
         setMessages(prev => [...prev, { role: 'assistant', content: `Failed to ingest repository: ${err.message}`, sources: [] }])
       } finally {
@@ -120,7 +123,7 @@ export default function ChatBox() {
     setMessages((prev) => [...prev, { role: 'user', content: submission }])
     setLoading(true)
     try {
-      const result = await sendChatMessage(submission, userId)
+      const result = await sendChatMessage(submission)
       setMessages((prev) => [
         ...prev,
         {
@@ -151,10 +154,14 @@ export default function ChatBox() {
     setLoading(true)
     try {
       const res = await uploadDocument(file)
-      const content = res.data.is_background
-        ? `Knowledge base update started for ${file.name} in the background. It will be ready for questioning shortly.`
-        : `Successfully ingested ${res.data.chunks_added} chunks from ${file.name}. The knowledge base is updated!`
-      setMessages(prev => [...prev, { role: 'assistant', content: content, sources: [] }])
+      const jobId = res?.data?.job_id
+      if (!jobId) {
+        setMessages(prev => [...prev, { role: 'assistant', content: `Upload received for ${file.name}, but tracking is unavailable right now.`, sources: [] }])
+      } else {
+        setMessages(prev => [...prev, { role: 'assistant', content: `Upload received for ${file.name}. I am processing it now.`, sources: [] }])
+        const job = await waitForIngestJob(jobId)
+        setMessages(prev => [...prev, { role: 'assistant', content: `Document ready. Added ${job.chunks_added} chunks from ${file.name}.`, sources: [] }])
+      }
     } catch (err) {
        setMessages(prev => [...prev, { role: 'assistant', content: `Failed to ingest document: ${err.message}`, sources: [] }])
     } finally {

@@ -16,4 +16,6 @@ The backend for Knowra AI. A high-performance FastAPI server utilizing FAISS for
 - `POST /chat`: Query the knowledge base.
 - `POST /ingest/file`: Ingest local PDF/Text.
 - `POST /ingest/github`: Ingest a GitHub repo URL.
+- `POST /ingest/upload`: Upload and queue a document ingestion job.
+- `GET /ingest/jobs/{job_id}`: Track ingestion job status.
 - `POST /reset`: Clear the vector data.

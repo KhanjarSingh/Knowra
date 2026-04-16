@@ -1,4 +1,9 @@
 def chunk_text(text: str, source_name: str, chunk_size: int = 1500, overlap: int = 200) -> list:
+    if chunk_size <= 0:
+        return []
+    if overlap >= chunk_size:
+        overlap = max(0, chunk_size // 4)
+
     chunks = []
     start = 0
     text = text.replace('\r', '')
