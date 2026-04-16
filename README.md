@@ -124,8 +124,9 @@ Simply type your question in the message box. Knowra will search its indexed dat
 - **Optional**: `EMBEDDING_BACKEND=hash` for fastest and most stable ingestion on low-memory instances. Use `sentence-transformers` for higher semantic quality if resources allow.
 
 ### Ingestion Job Status
-- `POST /ingest/upload` or `POST /ingest/github` returns a `job_id`
-- Poll `GET /ingest/jobs/{job_id}` until status is `completed` or `failed`
+- `POST /ingest/upload` ingests documents immediately and returns `chunks_added`
+- `POST /ingest/github` returns a `job_id`
+- Poll `GET /ingest/jobs/{job_id}` for GitHub ingestion until status is `completed` or `failed`
 
 ### Frontend (Vercel)
 - **Root Directory**: `frontend`

@@ -171,7 +171,12 @@ export default function ChatBox() {
     try {
       const res = await uploadDocument(file)
       const jobId = res?.data?.job_id
-      if (!jobId) {
+      const isBackground = Boolean(res?.data?.is_background)
+      const chunksAdded = Number(res?.data?.chunks_added || 0)
+
+      if (!isBackground) {
+        setMessages(prev => [...prev, { role: 'assistant', content: `Document ready. Added ${chunksAdded} chunks from ${file.name}.`, sources: [] }])
+      } else if (!jobId) {
         setMessages(prev => [...prev, { role: 'assistant', content: `Upload received for ${file.name}, but tracking is unavailable right now.`, sources: [] }])
       } else {
         setMessages(prev => [...prev, { role: 'assistant', content: `Upload received for ${file.name}. I am processing it now.`, sources: [] }])

@@ -68,21 +68,22 @@ def ingest_upload(file: UploadFile = File(...)) -> IngestResponse:
     finally:
         file.file.close()
 
-    job = submit_job(
-        "document",
-        file.filename or os.path.basename(tmp_path),
-        ingest_file,
-        tmp_path,
-        cleanup=lambda: os.path.exists(tmp_path) and os.remove(tmp_path),
-    )
+    try:
+        chunks_added = ingest_file(tmp_path)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to ingest uploaded file: {exc}") from exc
+    finally:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+
     return IngestResponse(
         success=True,
-        message="File received. Ingestion queued.",
+        message="File ingested successfully.",
         data=IngestData(
-            chunks_added=0,
-            is_background=True,
-            job_id=job.job_id,
-            job_status=job.status,
+            chunks_added=chunks_added,
+            is_background=False,
+            job_id=None,
+            job_status="completed",
         ),
     )
 
