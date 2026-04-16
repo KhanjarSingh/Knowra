@@ -43,19 +43,44 @@ export async function getIngestJob(jobId) {
   return parseResponse(response, 'Failed to fetch ingest job status')
 }
 
-export async function waitForIngestJob(jobId, { timeoutMs = 180000, pollEveryMs = 2000 } = {}) {
+export async function waitForIngestJob(jobId, { timeoutMs = 180000, pollEveryMs = 2000, onProgress } = {}) {
   const startedAt = Date.now()
   let lastState = null
+  let consecutivePollErrors = 0
 
   while (Date.now() - startedAt < timeoutMs) {
-    const payload = await getIngestJob(jobId)
-    const job = payload?.data
-    if (!job) throw new Error('Invalid ingest job payload')
-    lastState = job
+    try {
+      const payload = await getIngestJob(jobId)
+      const job = payload?.data
+      if (!job) throw new Error('Invalid ingest job payload')
+      lastState = job
+      consecutivePollErrors = 0
+      if (typeof onProgress === 'function') {
+        onProgress(job)
+      }
 
-    if (job.status === 'completed') return job
-    if (job.status === 'failed') {
-      throw new Error(job.error || 'Ingestion failed')
+      if (job.status === 'completed') return job
+      if (job.status === 'failed') {
+        throw new Error(job.error || 'Ingestion failed')
+      }
+    } catch (error) {
+      const message = error?.message || 'Failed to fetch'
+      if (message.includes('Job not found')) {
+        throw new Error('Ingestion job was lost after a server restart. Please upload again.')
+      }
+
+      consecutivePollErrors += 1
+      if (typeof onProgress === 'function') {
+        onProgress({ progress_message: `Reconnecting to server... (${consecutivePollErrors})` })
+      }
+
+      if (consecutivePollErrors >= 8) {
+        throw new Error('Connection interrupted while tracking ingestion. Please retry in a moment.')
+      }
+
+      const backoffMs = Math.min(6000, pollEveryMs * consecutivePollErrors)
+      await new Promise(resolve => setTimeout(resolve, backoffMs))
+      continue
     }
 
     await new Promise(resolve => setTimeout(resolve, pollEveryMs))

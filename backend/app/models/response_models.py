@@ -51,6 +51,10 @@ class JobData(BaseModel):
     finished_at: float | None = None
     chunks_added: int = 0
     error: str | None = None
+    progress_current: int = 0
+    progress_total: int = 0
+    progress_message: str | None = None
+    updated_at: float | None = None
 
 
 class JobResponse(BaseModel):

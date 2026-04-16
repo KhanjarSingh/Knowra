@@ -1,12 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { sendChatMessage, uploadDocument, ingestGitHub, resetIndex, waitForIngestJob } from '../services/api'
-function Loader({ isDark }) {
+function Loader({ isDark, label }) {
   const dotColor = isDark ? 'bg-white/70' : 'bg-black/60'
   return (
-    <div className="flex items-center gap-1.5 py-2 px-1">
-      <span className={`h-1.5 w-1.5 animate-bounce rounded-full ${dotColor} [animation-delay:-0.3s]`} />
-      <span className={`h-1.5 w-1.5 animate-bounce rounded-full ${dotColor} [animation-delay:-0.15s]`} />
-      <span className={`h-1.5 w-1.5 animate-bounce rounded-full ${dotColor}`} />
+    <div className="flex flex-col items-start gap-2 py-2 px-1">
+      <div className="flex items-center gap-1.5">
+        <span className={`h-1.5 w-1.5 animate-bounce rounded-full ${dotColor} [animation-delay:-0.3s]`} />
+        <span className={`h-1.5 w-1.5 animate-bounce rounded-full ${dotColor} [animation-delay:-0.15s]`} />
+        <span className={`h-1.5 w-1.5 animate-bounce rounded-full ${dotColor}`} />
+      </div>
+      {label && (
+        <span className={`text-[11px] ${isDark ? 'text-white/60' : 'text-black/60'}`}>
+          {label}
+        </span>
+      )}
     </div>
   )
 }
@@ -67,6 +74,7 @@ export default function ChatBox() {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [loadingStatus, setLoadingStatus] = useState('')
   const [error, setError] = useState('')
   const [isDark, setIsDark] = useState(true)
   const [showMenu, setShowMenu] = useState(false)
@@ -102,6 +110,7 @@ export default function ChatBox() {
         return
       }
       setMessages(prev => [...prev, { role: 'user', content: `Processing GitHub Repository:\n${submission}`, type: 'ingest' }])
+      setLoadingStatus('Queueing repository ingestion...')
       setLoading(true)
       try {
         const res = await ingestGitHub(submission)
@@ -110,12 +119,18 @@ export default function ChatBox() {
           setMessages(prev => [...prev, { role: 'assistant', content: 'Repository ingestion started, but no job id was returned.', sources: [] }])
         } else {
           setMessages(prev => [...prev, { role: 'assistant', content: 'Repository queued. I am indexing it now and will confirm once it is ready.', sources: [] }])
-          const job = await waitForIngestJob(jobId)
+          const job = await waitForIngestJob(jobId, {
+            onProgress: (progressJob) => {
+              const label = progressJob?.progress_message
+              if (label) setLoadingStatus(label)
+            },
+          })
           setMessages(prev => [...prev, { role: 'assistant', content: `Repository indexing complete. Added ${job.chunks_added} chunks to your knowledge base.`, sources: [] }])
         }
       } catch (err) {
         setMessages(prev => [...prev, { role: 'assistant', content: `Failed to ingest repository: ${err.message}`, sources: [] }])
       } finally {
+        setLoadingStatus('')
         setLoading(false)
       }
       return
@@ -151,6 +166,7 @@ export default function ChatBox() {
     if (!file) return
     if (fileInputRef.current) fileInputRef.current.value = ''
     setMessages(prev => [...prev, { role: 'user', content: `Uploading document: ${file.name}`, type: 'ingest' }])
+    setLoadingStatus('Uploading and preparing document...')
     setLoading(true)
     try {
       const res = await uploadDocument(file)
@@ -159,12 +175,18 @@ export default function ChatBox() {
         setMessages(prev => [...prev, { role: 'assistant', content: `Upload received for ${file.name}, but tracking is unavailable right now.`, sources: [] }])
       } else {
         setMessages(prev => [...prev, { role: 'assistant', content: `Upload received for ${file.name}. I am processing it now.`, sources: [] }])
-        const job = await waitForIngestJob(jobId)
+        const job = await waitForIngestJob(jobId, {
+          onProgress: (progressJob) => {
+            const label = progressJob?.progress_message
+            if (label) setLoadingStatus(label)
+          },
+        })
         setMessages(prev => [...prev, { role: 'assistant', content: `Document ready. Added ${job.chunks_added} chunks from ${file.name}.`, sources: [] }])
       }
     } catch (err) {
        setMessages(prev => [...prev, { role: 'assistant', content: `Failed to ingest document: ${err.message}`, sources: [] }])
     } finally {
+      setLoadingStatus('')
       setLoading(false)
     }
   }
@@ -389,7 +411,7 @@ export default function ChatBox() {
               <div className={`rounded-3xl border px-6 py-4 shadow-2xl backdrop-blur-2xl ${
                 isDark ? 'border-white/5 bg-black/40' : 'border-black/5 bg-white'
               }`}>
-                <Loader isDark={isDark} />
+                <Loader isDark={isDark} label={loadingStatus} />
               </div>
             </div>
           )}

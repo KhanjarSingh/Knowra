@@ -5,6 +5,7 @@ from fastapi import HTTPException
 
 from config import GITHUB_TOKEN
 from db.vector_store import add_chunks
+from services.job_service import update_current_job
 from utils.chunker import chunk_text
 
 SUPPORTED_EXTENSIONS = {
@@ -128,6 +129,7 @@ def fetch_file_content(download_url: str) -> str:
 
 
 def ingest_repo(repo_url: str) -> int:
+    update_current_job(progress_message="Reading repository structure")
     owner, repo = parse_repo_url(repo_url)
     files = get_repo_files(owner, repo)
     if not files:
@@ -136,14 +138,30 @@ def ingest_repo(repo_url: str) -> int:
     total_chunks = 0
     chunk_buffer: list[str] = []
     chunk_flush_threshold = 120
+    total_files = len(files)
+    update_current_job(progress_current=0, progress_total=total_files, progress_message="Fetching repository files")
 
-    for file in files:
+    for idx, file in enumerate(files, start=1):
         content = fetch_file_content(file["download_url"])
         if not content.strip():
+            if idx % 10 == 0 or idx == total_files:
+                update_current_job(
+                    progress_current=idx,
+                    progress_total=total_files,
+                    chunks_added=total_chunks,
+                    progress_message=f"Processed {idx}/{total_files} files",
+                )
             continue
 
         file_chunks = chunk_text(content, file["path"])
         if not file_chunks:
+            if idx % 10 == 0 or idx == total_files:
+                update_current_job(
+                    progress_current=idx,
+                    progress_total=total_files,
+                    chunks_added=total_chunks,
+                    progress_message=f"Processed {idx}/{total_files} files",
+                )
             continue
 
         chunk_buffer.extend(file_chunks)
@@ -153,7 +171,21 @@ def ingest_repo(repo_url: str) -> int:
             add_chunks(chunk_buffer)
             chunk_buffer.clear()
 
+        if idx % 10 == 0 or idx == total_files:
+            update_current_job(
+                progress_current=idx,
+                progress_total=total_files,
+                chunks_added=total_chunks,
+                progress_message=f"Processed {idx}/{total_files} files",
+            )
+
     if chunk_buffer:
         add_chunks(chunk_buffer)
 
+    update_current_job(
+        progress_current=total_files,
+        progress_total=total_files,
+        chunks_added=total_chunks,
+        progress_message="Repository indexing completed",
+    )
     return total_chunks
